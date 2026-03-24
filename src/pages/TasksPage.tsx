@@ -100,7 +100,13 @@ const TasksPage = () => {
                         {task.actionType && (
                           <div className="mt-2 flex flex-wrap gap-2">
                             <button
-                              onClick={() => openTaskPath(resource.path) || openTaskResource(task.actionType)}
+                              onClick={() => {
+                                if (resource.path) {
+                                  openTaskPath(resource.path);
+                                  return;
+                                }
+                                openTaskResource(task.actionType);
+                              }}
                               className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
                             >
                               {task.actionLabel ?? "Open"}
