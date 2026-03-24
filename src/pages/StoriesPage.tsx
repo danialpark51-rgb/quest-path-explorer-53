@@ -5,27 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, BookOpen, ExternalLink, Headphones, Sparkles } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import YouTubeEmbed from "@/components/YouTubeEmbed";
-
-const storyVideoMap: Record<string, string> = {
-  "1": "https://www.youtube.com/watch?v=arC7y8N26D4",
-  "2": "https://www.youtube.com/watch?v=Dxcc6ycZ73M",
-  "3": "https://www.youtube.com/watch?v=wf91rEGw88Q",
-  "4": "https://www.youtube.com/watch?v=w6IaQqQXQe0",
-  "5": "https://www.youtube.com/watch?v=pyhZ9qw0u7E",
-  "6": "https://www.youtube.com/watch?v=7GGzc3x9WJU",
-  "7": "https://www.youtube.com/watch?v=XtFTjM7lNN4",
-  "8": "https://www.youtube.com/watch?v=HUP6Z5voiS8",
-  "9": "https://www.youtube.com/watch?v=Un2yBgIAxYs",
-  "10": "https://www.youtube.com/watch?v=Hz4FNBj1APA",
-  "11": "https://www.youtube.com/watch?v=arj7oStGLkU",
-  "12": "https://www.youtube.com/watch?v=0Y0R7v9YfJ4",
-  "13": "https://www.youtube.com/watch?v=e-P5IFTqB98",
-  "14": "https://www.youtube.com/watch?v=2ePf9rue1Ao",
-  "15": "https://www.youtube.com/watch?v=VQv0M7Pr0g8",
-  "16": "https://www.youtube.com/watch?v=vd2dtkMINIw",
-  "17": "https://www.youtube.com/watch?v=zEPdVk-6D4Q",
-  "18": "https://www.youtube.com/watch?v=JhHMJCUmq28",
-};
+import { getStoryVideoUrl } from "@/data/videoRecommendations";
 
 const buildStoryParagraphs = (title: string, description: string) => [
   `${title} is now presented as a proper learning topic so students can read and understand the idea clearly before moving to video learning.`,
@@ -50,6 +30,7 @@ const StoriesPage = () => {
     () => filtered.find((story) => story.id === selectedStoryId) ?? filtered[0] ?? null,
     [filtered, selectedStoryId],
   );
+  const selectedStoryVideoUrl = selectedStory ? getStoryVideoUrl(selectedStory.id, selectedStory.title) : "";
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -155,7 +136,7 @@ const StoriesPage = () => {
                       <h3 className="font-display text-xl font-bold text-foreground">Related YouTube explanation</h3>
                     </div>
                     <a
-                      href={storyVideoMap[selectedStory.id]}
+                      href={selectedStoryVideoUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
@@ -163,7 +144,7 @@ const StoriesPage = () => {
                       <ExternalLink className="h-3.5 w-3.5" /> YouTube
                     </a>
                   </div>
-                  <YouTubeEmbed url={storyVideoMap[selectedStory.id]} title={selectedStory.title} />
+                  <YouTubeEmbed url={selectedStoryVideoUrl} title={selectedStory.title} />
                 </div>
 
                 <div className="rounded-3xl border border-border bg-card p-5 shadow-card">

@@ -6,22 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle, Circle, ExternalLink, PlayCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import YouTubeEmbed from "@/components/YouTubeEmbed";
-import { getYouTubeSearchUrl } from "@/lib/youtube";
-
-const skillVideoMap: Record<string, string> = {
-  coding: "https://www.youtube.com/watch?v=zOjov-2OZ0E",
-  "critical-thinking": "https://www.youtube.com/watch?v=dItUGF8GdTw",
-  communication: "https://www.youtube.com/watch?v=HAnw168huqA",
-  "time-management": "https://www.youtube.com/watch?v=iONDebHX9qk",
-  creativity: "https://www.youtube.com/watch?v=Uj1ykZWtPYI",
-  "digital-literacy": "https://www.youtube.com/watch?v=hG6P_n3XnGg",
-  "problem-solving": "https://www.youtube.com/watch?v=6yr8Fq47PUQ",
-  "emotional-intelligence": "https://www.youtube.com/watch?v=LgUCyWhJf6s",
-  "study-skills": "https://www.youtube.com/watch?v=IlU-zDU6aQ0",
-  collaboration: "https://www.youtube.com/watch?v=8P_wEz4md84",
-  observation: "https://www.youtube.com/watch?v=QmX3QYf6wUQ",
-  environmental: "https://www.youtube.com/watch?v=aGGBGcjdjXA",
-};
+import { getSkillLessonVideoRecommendations, getSkillLessonVideoUrl, skillOverviewVideoMap } from "@/data/videoRecommendations";
 
 const SkillDetailPage = () => {
   const { skillId } = useParams();
@@ -33,7 +18,8 @@ const SkillDetailPage = () => {
   if (!skill) return <div className="min-h-screen flex items-center justify-center text-foreground">Skill not found</div>;
 
   const selectedLesson = skill.lessons.find((lesson) => lesson.id === selectedLessonId) ?? skill.lessons[0];
-  const selectedLessonQuery = `${skill.title} ${selectedLesson.title} lesson for students`;
+  const selectedLessonVideoUrl = getSkillLessonVideoUrl(skill.id, skill.title, selectedLesson.id, selectedLesson.title);
+  const selectedLessonRecommendations = getSkillLessonVideoRecommendations(skill.title, selectedLesson.title);
 
   const handleComplete = (lessonId: number) => {
     const lid = `${skill.id}-${lessonId}`;
@@ -66,19 +52,30 @@ const SkillDetailPage = () => {
               <p className="text-sm font-medium text-primary">Selected lesson</p>
               <h2 className="font-display text-xl font-bold text-foreground">{selectedLesson.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Watch the module video below, then open a topic-specific YouTube search for this lesson.
+                Watch the selected lesson video below, then use the extra topic links for explanation, examples, and practice.
               </p>
             </div>
-            <a
-              href={getYouTubeSearchUrl(selectedLessonQuery)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
-            >
-              <ExternalLink className="w-3.5 h-3.5" /> Search lesson video
-            </a>
           </div>
-          <YouTubeEmbed url={skillVideoMap[skill.id]} title={`${skill.title} overview`} compact />
+          <YouTubeEmbed url={selectedLessonVideoUrl} title={`${selectedLesson.title} lesson video`} compact />
+          <div className="mt-3 flex flex-wrap gap-2">
+            {selectedLessonRecommendations.map((resource) => (
+              <a
+                key={resource.label}
+                href={resource.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
+              >
+                <ExternalLink className="w-3.5 h-3.5" /> {resource.label}
+              </a>
+            ))}
+          </div>
+          <div className="mt-3 rounded-2xl border border-border bg-muted/40 p-3">
+            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Module overview</p>
+            <div className="mt-2">
+              <YouTubeEmbed url={skillOverviewVideoMap[skill.id]} title={`${skill.title} overview`} compact />
+            </div>
+          </div>
         </div>
 
         {levels.map((level) => {
@@ -118,7 +115,7 @@ const SkillDetailPage = () => {
                           {done ? "Completed" : "Mark complete"}
                         </button>
                         <a
-                          href={getYouTubeSearchUrl(`${skill.title} ${lesson.title} explained for students`)}
+                          href={getSkillLessonVideoUrl(skill.id, skill.title, lesson.id, lesson.title)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"

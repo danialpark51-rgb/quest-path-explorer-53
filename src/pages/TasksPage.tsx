@@ -2,8 +2,9 @@ import { dailyTasks } from "@/data/dailyTasks";
 import { useUser } from "@/context/UserContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Flame } from "lucide-react";
+import { ArrowLeft, ExternalLink, Flame, PlayCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import { getDailyTaskResource } from "@/data/videoRecommendations";
 
 const TasksPage = () => {
   const navigate = useNavigate();
@@ -48,6 +49,10 @@ const TasksPage = () => {
     }
   };
 
+  const openTaskPath = (path?: string) => {
+    if (path) navigate(path);
+  };
+
   const difficulties = ["Easy", "Medium", "Hard"] as const;
   const diffColors = { Easy: "text-primary", Medium: "text-accent", Hard: "text-destructive" };
   const diffEmoji = { Easy: "🟢", Medium: "🟡", Hard: "🔴" };
@@ -73,6 +78,7 @@ const TasksPage = () => {
               <div className="space-y-2">
                 {tasks.map((task, idx) => {
                   const done = user.completedTasks.includes(task.id);
+                  const resource = getDailyTaskResource(task.id, user.selectedGoal);
                   return (
                     <motion.div
                       key={task.id}
@@ -92,12 +98,38 @@ const TasksPage = () => {
                         <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{task.title}</p>
                         <p className="text-xs text-muted-foreground">{task.description}</p>
                         {task.actionType && (
-                          <button
-                            onClick={() => openTaskResource(task.actionType)}
-                            className="mt-2 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
-                          >
-                            {task.actionLabel ?? "Open"}
-                          </button>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <button
+                              onClick={() => {
+                                if (resource.path) {
+                                  openTaskPath(resource.path);
+                                  return;
+                                }
+                                openTaskResource(task.actionType);
+                              }}
+                              className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
+                            >
+                              {task.actionLabel ?? "Open"}
+                            </button>
+                            {resource.videoUrl && (
+                              <a
+                                href={resource.videoUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition hover:opacity-90"
+                              >
+                                <PlayCircle className="h-3.5 w-3.5" /> Watch video
+                              </a>
+                            )}
+                            {resource.path && task.actionType !== "goal-videos" && (
+                              <button
+                                onClick={() => openTaskPath(resource.path)}
+                                className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
+                              >
+                                <ExternalLink className="h-3.5 w-3.5" /> Open lesson
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
                       <span className="text-xs font-bold text-accent">+{task.xp}XP</span>

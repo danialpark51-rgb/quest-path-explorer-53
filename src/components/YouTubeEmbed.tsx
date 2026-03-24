@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ExternalLink, PlayCircle } from "lucide-react";
 import { getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from "@/lib/youtube";
 
@@ -9,6 +10,7 @@ type YouTubeEmbedProps = {
 
 const YouTubeEmbed = ({ url, title, compact = false }: YouTubeEmbedProps) => {
   const embedUrl = getYouTubeEmbedUrl(url);
+  const [isLoaded, setIsLoaded] = useState(false);
 
   if (!embedUrl) {
     return (
@@ -35,15 +37,38 @@ const YouTubeEmbed = ({ url, title, compact = false }: YouTubeEmbedProps) => {
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
       <div className="relative aspect-video overflow-hidden bg-muted">
-        <iframe
-          src={embedUrl}
-          title={title}
-          className="h-full w-full"
-          loading="lazy"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-          referrerPolicy="strict-origin-when-cross-origin"
-          allowFullScreen
-        />
+        {isLoaded ? (
+          <iframe
+            src={embedUrl}
+            title={title}
+            className="h-full w-full"
+            loading="lazy"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allowFullScreen
+          />
+        ) : (
+          <div className="relative h-full w-full">
+            <img src={getYouTubeThumbnailUrl(url)} alt={title} className="h-full w-full object-cover" loading="lazy" />
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-foreground/45 px-4 text-center">
+              <button
+                type="button"
+                onClick={() => setIsLoaded(true)}
+                className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90"
+              >
+                <PlayCircle className="h-4 w-4" /> Play video
+              </button>
+              <a
+                href={url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-background/90 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-background"
+              >
+                <ExternalLink className="h-4 w-4" /> Open on YouTube
+              </a>
+            </div>
+          </div>
+        )}
       </div>
       {!compact && (
         <div className="flex items-center justify-between gap-3 p-4">
