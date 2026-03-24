@@ -8,6 +8,24 @@ import { useState } from "react";
 
 const diffColors = { Easy: "bg-primary/10 text-primary", Medium: "bg-accent/10 text-accent", Hard: "bg-destructive/10 text-destructive" };
 
+const gameUrls: Record<string, string> = {
+  "2048": "https://play2048.co/",
+  snake: "https://playsnake.org/",
+  sudoku: "https://sudoku.com/",
+  memory: "https://www.memozor.com/memory-games/for-kids",
+  chess: "https://www.chess.com/play/computer",
+  wordle: "https://www.nytimes.com/games/wordle/index.html",
+  "flappy-bird": "https://flappybird.io/",
+  tetris: "https://tetris.com/play-tetris",
+  crossword: "https://www.boatloadpuzzles.com/playcrossword",
+  minesweeper: "https://minesweeper.online/",
+  "typing-speed": "https://www.typingtest.com/",
+  jigsaw: "https://www.jigsawplanet.com/",
+  "connect-four": "https://www.mathsisfun.com/games/connect4.html",
+  "rubiks-cube": "https://rubikscu.be/",
+  "code-combat": "https://codecombat.com/",
+};
+
 const GamesPage = () => {
   const navigate = useNavigate();
   const { t } = useLanguage();
@@ -37,7 +55,7 @@ const GamesPage = () => {
           {filtered.map((game, idx) => (
             <motion.a
               key={game.id}
-              href={game.url}
+              href={gameUrls[game.id] || "#"}
               target="_blank"
               rel="noopener noreferrer"
               initial={{ opacity: 0, y: 10 }}
@@ -46,16 +64,14 @@ const GamesPage = () => {
               className="bg-card border border-border rounded-xl p-5 hover:shadow-elevated transition group block"
             >
               <div className="flex items-start justify-between">
-                <span className="text-4xl">{game.icon}</span>
+                <span className="text-4xl">{game.emoji}</span>
                 <ExternalLink className="w-4 h-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition" />
               </div>
               <h3 className="text-lg font-display font-bold text-foreground mt-3">{game.title}</h3>
               <p className="text-sm text-muted-foreground mt-1">{game.description}</p>
               <div className="mt-3 flex flex-wrap gap-2">
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffColors[game.difficulty]}`}>{game.difficulty}</span>
-                {game.skills.map(s => (
-                  <span key={s} className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{s}</span>
-                ))}
+                <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{game.category}</span>
               </div>
             </motion.a>
           ))}
