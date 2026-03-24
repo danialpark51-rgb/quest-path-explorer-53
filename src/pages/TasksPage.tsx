@@ -17,6 +17,37 @@ const TasksPage = () => {
     addXP(xp);
   };
 
+  const openTaskResource = (actionType?: string) => {
+    switch (actionType) {
+      case "goal-videos":
+        navigate(user.selectedGoal ? `/goal/${user.selectedGoal}` : "/goals");
+        break;
+      case "skills":
+        navigate("/skills");
+        break;
+      case "quiz":
+        navigate("/quiz");
+        break;
+      case "stories":
+        navigate("/stories");
+        break;
+      case "games":
+        navigate("/games");
+        break;
+      case "news":
+        navigate("/news");
+        break;
+      case "observation":
+        navigate("/observation");
+        break;
+      case "ai":
+        navigate("/ai-assistant");
+        break;
+      default:
+        break;
+    }
+  };
+
   const difficulties = ["Easy", "Medium", "Hard"] as const;
   const diffColors = { Easy: "text-primary", Medium: "text-accent", Hard: "text-destructive" };
   const diffEmoji = { Easy: "🟢", Medium: "🟡", Hard: "🔴" };
@@ -60,6 +91,14 @@ const TasksPage = () => {
                       <div className="flex-1">
                         <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{task.title}</p>
                         <p className="text-xs text-muted-foreground">{task.description}</p>
+                        {task.actionType && (
+                          <button
+                            onClick={() => openTaskResource(task.actionType)}
+                            className="mt-2 rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
+                          >
+                            {task.actionLabel ?? "Open"}
+                          </button>
+                        )}
                       </div>
                       <span className="text-xs font-bold text-accent">+{task.xp}XP</span>
                     </motion.div>

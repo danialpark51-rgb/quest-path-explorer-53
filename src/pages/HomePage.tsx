@@ -10,7 +10,7 @@ import { useNavigate } from "react-router-dom";
 import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
-  Gamepad2, Eye, Globe,
+  Gamepad2, Eye, Globe, UserCircle2,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -57,6 +57,9 @@ const HomePage = () => {
                 <Flame className="w-4 h-4 text-accent" />
                 <span className="text-sm font-semibold">{user.streak} {t("days")}</span>
               </div>
+              <button onClick={() => navigate("/profile")} className="p-2 rounded-full bg-secondary/20 hover:bg-secondary/30 transition" aria-label="Open profile">
+                <UserCircle2 className="w-4 h-4" />
+              </button>
               <button onClick={logout} className="p-2 rounded-full bg-secondary/20 hover:bg-secondary/30 transition">
                 <LogOut className="w-4 h-4" />
               </button>
