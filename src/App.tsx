@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider, useUser } from "@/context/UserContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import LoginPage from "./pages/LoginPage";
 import GoalSelectionPage from "./pages/GoalSelectionPage";
 import HomePage from "./pages/HomePage";
@@ -15,6 +16,8 @@ import StoriesPage from "./pages/StoriesPage";
 import NewsPage from "./pages/NewsPage";
 import TasksPage from "./pages/TasksPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
+import GamesPage, { GamePlayPage } from "./pages/GamesPage";
+import ObservationPage from "./pages/ObservationPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -42,6 +45,9 @@ const AppRoutes = () => {
       <Route path="/news" element={<ProtectedRoute><NewsPage /></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><TasksPage /></ProtectedRoute>} />
       <Route path="/ai-assistant" element={<ProtectedRoute><AIAssistantPage /></ProtectedRoute>} />
+      <Route path="/games" element={<ProtectedRoute><GamesPage /></ProtectedRoute>} />
+      <Route path="/game/:gameId" element={<ProtectedRoute><GamePlayPage /></ProtectedRoute>} />
+      <Route path="/observation" element={<ProtectedRoute><ObservationPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -53,9 +59,11 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <UserProvider>
-          <AppRoutes />
-        </UserProvider>
+        <LanguageProvider>
+          <UserProvider>
+            <AppRoutes />
+          </UserProvider>
+        </LanguageProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
