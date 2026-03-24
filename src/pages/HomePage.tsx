@@ -7,6 +7,7 @@ import { newsItems } from "@/data/news";
 import { audioStories } from "@/data/audioStories";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
+import { getDailyTaskResource } from "@/data/videoRecommendations";
 import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
@@ -125,6 +126,7 @@ const HomePage = () => {
           <div className="space-y-2">
             {dailyTasks.slice(0, 4).map((task) => {
               const done = user.completedTasks.includes(task.id);
+              const resource = getDailyTaskResource(task.id, user.selectedGoal);
               return (
                 <div key={task.id} className={`flex items-center gap-3 p-3 rounded-xl ${done ? "bg-primary/5" : "bg-card"} border border-border transition`}>
                   <button onClick={() => handleTaskComplete(task.id, task.xp)} disabled={done}
@@ -134,6 +136,9 @@ const HomePage = () => {
                   <div className="flex-1 min-w-0">
                     <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{task.title}</p>
                     <p className="text-xs text-muted-foreground">{task.description}</p>
+                    {resource.videoTitle && (
+                      <p className="mt-1 text-xs text-primary">Recommended: {resource.videoTitle}</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-1">
                     <DifficultyBadge d={task.difficulty} />
