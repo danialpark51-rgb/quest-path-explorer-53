@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BookOpen, Trophy, Headphones, MessageCircle } from "lucide-react";
+import { Home, BookOpen, Trophy, Headphones, MessageCircle, UserCircle2 } from "lucide-react";
 
 const tabs = [
   { path: "/home", icon: Home, label: "Home" },
@@ -7,6 +7,7 @@ const tabs = [
   { path: "/quiz", icon: Trophy, label: "Quiz" },
   { path: "/stories", icon: Headphones, label: "Stories" },
   { path: "/ai-assistant", icon: MessageCircle, label: "AI" },
+  { path: "/profile", icon: UserCircle2, label: "Profile" },
 ];
 
 const BottomNav = () => {

@@ -18,6 +18,7 @@ import TasksPage from "./pages/TasksPage";
 import AIAssistantPage from "./pages/AIAssistantPage";
 import GamesPage, { GamePlayPage } from "./pages/GamesPage";
 import ObservationPage from "./pages/ObservationPage";
+import ProfilePage from "./pages/ProfilePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const AppRoutes = () => {
       <Route path="/games" element={<ProtectedRoute><GamesPage /></ProtectedRoute>} />
       <Route path="/game/:gameId" element={<ProtectedRoute><GamePlayPage /></ProtectedRoute>} />
       <Route path="/observation" element={<ProtectedRoute><ObservationPage /></ProtectedRoute>} />
+      <Route path="/profile" element={<ProtectedRoute><ProfilePage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

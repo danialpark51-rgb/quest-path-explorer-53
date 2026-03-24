@@ -5,6 +5,7 @@ import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { ArrowLeft, Play, Star, Briefcase, TrendingUp, BookOpen, Trophy } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import YouTubeEmbed, { YouTubePreviewCard } from "@/components/YouTubeEmbed";
 
 const GoalDetailPage = () => {
   const { goalId } = useParams();
@@ -88,32 +89,26 @@ const GoalDetailPage = () => {
           <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
             <Play className="w-5 h-5 text-primary" /> {t("video_library")} ({goal.videos.length})
           </h2>
-          <div className="space-y-3">
-            {goal.videos.map((v, i) => (
-              <motion.a
-                key={i}
-                href={v.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex gap-3 bg-card border border-border rounded-xl p-3 hover:shadow-card transition group"
-              >
-                <div className="relative w-32 flex-shrink-0 rounded-lg overflow-hidden bg-muted aspect-video">
-                  <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" loading="lazy"
-                    onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
-                  <div className="absolute inset-0 flex items-center justify-center bg-foreground/0 group-hover:bg-foreground/20 transition">
-                    <Play className="w-6 h-6 text-primary-foreground opacity-0 group-hover:opacity-100 transition" />
-                  </div>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-sm font-semibold text-foreground">{v.title}</h3>
-                  <p className="text-xs text-muted-foreground mt-1">{v.duration}</p>
-                </div>
-              </motion.a>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {goal.videos.slice(0, 4).map((v, i) => (
+              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+                <YouTubeEmbed url={v.url} title={v.title} compact />
+              </motion.div>
             ))}
           </div>
+
+          {goal.videos.length > 4 && (
+            <div className="mt-4">
+              <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">More goal videos</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {goal.videos.slice(4).map((v, i) => (
+                  <motion.div key={`${v.title}-${i}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
+                    <YouTubePreviewCard url={v.url} title={v.title} />
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

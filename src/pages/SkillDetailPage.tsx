@@ -1,17 +1,39 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { skills } from "@/data/skills";
 import { useUser } from "@/context/UserContext";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle, Circle, Lock } from "lucide-react";
+import { ArrowLeft, CheckCircle, Circle, ExternalLink, PlayCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import YouTubeEmbed from "@/components/YouTubeEmbed";
+import { getYouTubeSearchUrl } from "@/lib/youtube";
+
+const skillVideoMap: Record<string, string> = {
+  coding: "https://www.youtube.com/watch?v=zOjov-2OZ0E",
+  "critical-thinking": "https://www.youtube.com/watch?v=dItUGF8GdTw",
+  communication: "https://www.youtube.com/watch?v=HAnw168huqA",
+  "time-management": "https://www.youtube.com/watch?v=iONDebHX9qk",
+  creativity: "https://www.youtube.com/watch?v=Uj1ykZWtPYI",
+  "digital-literacy": "https://www.youtube.com/watch?v=hG6P_n3XnGg",
+  "problem-solving": "https://www.youtube.com/watch?v=6yr8Fq47PUQ",
+  "emotional-intelligence": "https://www.youtube.com/watch?v=LgUCyWhJf6s",
+  "study-skills": "https://www.youtube.com/watch?v=IlU-zDU6aQ0",
+  collaboration: "https://www.youtube.com/watch?v=8P_wEz4md84",
+  observation: "https://www.youtube.com/watch?v=QmX3QYf6wUQ",
+  environmental: "https://www.youtube.com/watch?v=aGGBGcjdjXA",
+};
 
 const SkillDetailPage = () => {
   const { skillId } = useParams();
   const navigate = useNavigate();
   const { user, completeLesson, addXP } = useUser();
   const skill = skills.find((s) => s.id === skillId);
+  const [selectedLessonId, setSelectedLessonId] = useState<number | null>(skill?.lessons[0]?.id ?? null);
 
   if (!skill) return <div className="min-h-screen flex items-center justify-center text-foreground">Skill not found</div>;
+
+  const selectedLesson = skill.lessons.find((lesson) => lesson.id === selectedLessonId) ?? skill.lessons[0];
+  const selectedLessonQuery = `${skill.title} ${selectedLesson.title} lesson for students`;
 
   const handleComplete = (lessonId: number) => {
     const lid = `${skill.id}-${lessonId}`;
@@ -38,6 +60,27 @@ const SkillDetailPage = () => {
           </div>
         </div>
 
+        <div className="mb-6 rounded-3xl border border-border bg-card p-4 shadow-card">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-primary">Selected lesson</p>
+              <h2 className="font-display text-xl font-bold text-foreground">{selectedLesson.title}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Watch the module video below, then open a topic-specific YouTube search for this lesson.
+              </p>
+            </div>
+            <a
+              href={getYouTubeSearchUrl(selectedLessonQuery)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-2 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
+            >
+              <ExternalLink className="w-3.5 h-3.5" /> Search lesson video
+            </a>
+          </div>
+          <YouTubeEmbed url={skillVideoMap[skill.id]} title={`${skill.title} overview`} compact />
+        </div>
+
         {levels.map((level) => {
           const levelLessons = skill.lessons.filter((l) => l.level === level);
           return (
@@ -55,14 +98,34 @@ const SkillDetailPage = () => {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: idx * 0.05 }}
-                      onClick={() => handleComplete(lesson.id)}
-                      className={`flex items-center gap-3 p-3 rounded-xl border border-border cursor-pointer transition ${done ? "bg-primary/5" : "bg-card hover:shadow-card"}`}
+                      className={`rounded-xl border border-border p-3 transition ${selectedLesson.id === lesson.id ? "bg-primary/5 shadow-card" : "bg-card hover:shadow-card"}`}
                     >
-                      {done ? <CheckCircle className="w-5 h-5 text-primary flex-shrink-0" /> : <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0" />}
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{lesson.title}</p>
+                      <div className="flex items-start gap-3">
+                        {done ? <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" /> : <Circle className="w-5 h-5 text-muted-foreground flex-shrink-0 mt-0.5" />}
+                        <button onClick={() => setSelectedLessonId(lesson.id)} className="flex-1 text-left">
+                          <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{lesson.title}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {lesson.level} lesson focused on {lesson.title.toLowerCase()}.
+                          </p>
+                        </button>
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">{lesson.duration}</span>
                       </div>
-                      <span className="text-xs text-muted-foreground">{lesson.duration}</span>
+                      <div className="mt-3 flex flex-wrap items-center gap-2 pl-8">
+                        <button
+                          onClick={() => handleComplete(lesson.id)}
+                          className="rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
+                        >
+                          {done ? "Completed" : "Mark complete"}
+                        </button>
+                        <a
+                          href={getYouTubeSearchUrl(`${skill.title} ${lesson.title} explained for students`)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
+                        >
+                          <PlayCircle className="w-3.5 h-3.5" /> Topic video
+                        </a>
+                      </div>
                     </motion.div>
                   );
                 })}
