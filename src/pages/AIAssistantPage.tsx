@@ -1,52 +1,103 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, Bot, User } from "lucide-react";
+import { ArrowLeft, Send, Bot, User, Loader2 } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import BottomNav from "@/components/BottomNav";
+import { useLanguage } from "@/context/LanguageContext";
+import { supabase } from "@/integrations/supabase/client";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-const sampleResponses: Record<string, string> = {
-  default: "I'm your AI study assistant! I can help you with questions about any subject — Math, Science, History, or career guidance. Try asking me something specific! 📚",
-  math: "Great question about Math! Here's a tip: Practice is the key to mastering mathematics. Start with understanding the concepts, then solve problems step by step. Would you like me to explain a specific topic?",
-  science: "Science is fascinating! Whether it's Physics, Chemistry, or Biology, the key is to understand 'why' things happen, not just 'what' happens. What specific science topic interests you?",
-  career: "Choosing a career is a big decision! Think about what you enjoy doing, your strengths, and what impact you want to make. I can help you explore different career paths. Which field interests you?",
-  study: "Here are some study tips: 1) Use the Pomodoro technique (25 min study, 5 min break), 2) Teach what you learn to someone else, 3) Make mind maps for complex topics, 4) Review before sleeping!",
-  exam: "Exam preparation tips: 1) Start early, don't cram, 2) Focus on understanding, not memorizing, 3) Solve previous year papers, 4) Take mock tests, 5) Stay healthy — sleep well and eat right!",
-};
+const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
 const AIAssistantPage = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([
     { role: "assistant", content: "Hi there! 👋 I'm your AI learning assistant. Ask me anything about your studies, career guidance, exam tips, or any subject you're curious about!" },
   ]);
   const [input, setInput] = useState("");
-  const [isTyping, setIsTyping] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim()) return;
-    const userMsg = input.trim();
-    setMessages((prev) => [...prev, { role: "user", content: userMsg }]);
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  const handleSend = async () => {
+    if (!input.trim() || isLoading) return;
+    const userMsg: Message = { role: "user", content: input.trim() };
+    const allMessages = [...messages, userMsg];
+    setMessages(allMessages);
     setInput("");
-    setIsTyping(true);
+    setIsLoading(true);
 
-    setTimeout(() => {
-      const lower = userMsg.toLowerCase();
-      let response = sampleResponses.default;
-      if (lower.includes("math") || lower.includes("calcul") || lower.includes("algebra")) response = sampleResponses.math;
-      else if (lower.includes("science") || lower.includes("physics") || lower.includes("chemistry") || lower.includes("biology")) response = sampleResponses.science;
-      else if (lower.includes("career") || lower.includes("job") || lower.includes("future")) response = sampleResponses.career;
-      else if (lower.includes("study") || lower.includes("learn") || lower.includes("tip")) response = sampleResponses.study;
-      else if (lower.includes("exam") || lower.includes("test") || lower.includes("jee") || lower.includes("neet") || lower.includes("upsc")) response = sampleResponses.exam;
+    let assistantSoFar = "";
+    const upsertAssistant = (chunk: string) => {
+      assistantSoFar += chunk;
+      setMessages(prev => {
+        const last = prev[prev.length - 1];
+        if (last?.role === "assistant" && prev.length === allMessages.length + 1) {
+          return prev.map((m, i) => (i === prev.length - 1 ? { ...m, content: assistantSoFar } : m));
+        }
+        return [...prev, { role: "assistant", content: assistantSoFar }];
+      });
+    };
 
-      setMessages((prev) => [...prev, { role: "assistant", content: response }]);
-      setIsTyping(false);
-    }, 1200);
+    try {
+      const resp = await fetch(CHAT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({ messages: allMessages }),
+      });
+
+      if (!resp.ok || !resp.body) {
+        const err = await resp.json().catch(() => ({ error: "Connection failed" }));
+        upsertAssistant(err.error || "Sorry, something went wrong. Please try again.");
+        setIsLoading(false);
+        return;
+      }
+
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let textBuffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        textBuffer += decoder.decode(value, { stream: true });
+
+        let newlineIndex: number;
+        while ((newlineIndex = textBuffer.indexOf("\n")) !== -1) {
+          let line = textBuffer.slice(0, newlineIndex);
+          textBuffer = textBuffer.slice(newlineIndex + 1);
+          if (line.endsWith("\r")) line = line.slice(0, -1);
+          if (line.startsWith(":") || line.trim() === "") continue;
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (jsonStr === "[DONE]") break;
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const content = parsed.choices?.[0]?.delta?.content as string | undefined;
+            if (content) upsertAssistant(content);
+          } catch {
+            textBuffer = line + "\n" + textBuffer;
+            break;
+          }
+        }
+      }
+    } catch (err) {
+      upsertAssistant("Sorry, I couldn't connect to the AI service. Please check your connection and try again.");
+    }
+    setIsLoading(false);
   };
 
   return (
     <div className="min-h-screen bg-background flex flex-col pb-16">
-      {/* Header */}
       <div className="bg-card border-b border-border px-4 py-3">
         <div className="max-w-2xl mx-auto flex items-center gap-3">
           <button onClick={() => navigate("/home")} className="text-muted-foreground hover:text-foreground transition">
@@ -62,7 +113,6 @@ const AIAssistantPage = () => {
         </div>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-3">
           {messages.map((msg, idx) => (
@@ -78,7 +128,11 @@ const AIAssistantPage = () => {
                 </div>
               )}
               <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${msg.role === "user" ? "gradient-hero text-primary-foreground rounded-tr-sm" : "bg-card border border-border text-foreground rounded-tl-sm"}`}>
-                {msg.content}
+                {msg.role === "assistant" ? (
+                  <div className="prose prose-sm max-w-none dark:prose-invert prose-p:my-1 prose-li:my-0">
+                    <ReactMarkdown>{msg.content}</ReactMarkdown>
+                  </div>
+                ) : msg.content}
               </div>
               {msg.role === "user" && (
                 <div className="w-7 h-7 rounded-full bg-secondary flex items-center justify-center flex-shrink-0 mt-1">
@@ -87,8 +141,7 @@ const AIAssistantPage = () => {
               )}
             </motion.div>
           ))}
-
-          {isTyping && (
+          {isLoading && messages[messages.length - 1]?.role === "user" && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex gap-2">
               <div className="w-7 h-7 rounded-full gradient-hero flex items-center justify-center flex-shrink-0">
                 <Bot className="w-4 h-4 text-primary-foreground" />
@@ -102,10 +155,10 @@ const AIAssistantPage = () => {
               </div>
             </motion.div>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </div>
 
-      {/* Input */}
       <div className="bg-card border-t border-border px-4 py-3">
         <div className="max-w-2xl mx-auto flex gap-2">
           <input
@@ -113,15 +166,16 @@ const AIAssistantPage = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder="Ask me anything..."
+            placeholder={t("ask_anything")}
             className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition"
+            disabled={isLoading}
           />
           <button
             onClick={handleSend}
-            disabled={!input.trim()}
+            disabled={!input.trim() || isLoading}
             className="w-11 h-11 rounded-xl gradient-hero flex items-center justify-center text-primary-foreground hover:opacity-90 transition disabled:opacity-50"
           >
-            <Send className="w-4 h-4" />
+            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
           </button>
         </div>
       </div>
