@@ -13,6 +13,7 @@ const NewsPage = () => {
   const categories = ["All", ...Array.from(new Set(newsItems.map((n) => n.category)))];
   const filtered = filter === "All" ? newsItems : newsItems.filter((n) => n.category === filter);
   const selected = selectedId ? newsItems.find((n) => n.id === selectedId) : null;
+  const featured = filtered[0];
 
   // Group by date
   const grouped: Record<string, typeof newsItems> = {};
@@ -29,7 +30,24 @@ const NewsPage = () => {
           <ArrowLeft className="w-4 h-4" /> Home
         </button>
         <h1 className="text-2xl font-display font-bold text-foreground mb-2">📰 Daily News</h1>
-        <p className="text-sm text-muted-foreground mb-4">Stay updated with the latest news across science, education, technology, and more.</p>
+        <p className="text-sm text-muted-foreground mb-4">Stay updated with daily current affairs, world developments, education updates, and student-friendly explainers.</p>
+
+        {featured && (
+          <div className="mb-5 overflow-hidden rounded-3xl border border-border bg-card shadow-elevated">
+            <img src={featured.imageUrl} alt={featured.title} className="h-52 w-full object-cover" loading="lazy" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
+            <div className="p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">Featured current affair</span>
+                <span className="text-xs text-muted-foreground">{getDateLabel(featured.date)}</span>
+              </div>
+              <h2 className="mt-3 text-xl font-display font-bold text-foreground">{featured.title}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{featured.summary}</p>
+              <button type="button" onClick={() => setSelectedId(featured.id)} className="mt-4 rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90">
+                Read full update
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Category filters */}
         <div className="flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-none">

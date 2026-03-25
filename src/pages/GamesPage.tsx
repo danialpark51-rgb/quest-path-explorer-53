@@ -1,10 +1,11 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { games } from "@/data/games";
 import { useLanguage } from "@/context/LanguageContext";
 import BottomNav from "@/components/BottomNav";
 import { useState } from "react";
+import InAppGameArena from "@/components/InAppGameArena";
 
 const diffColors = { Easy: "bg-primary/10 text-primary", Medium: "bg-accent/10 text-accent", Hard: "bg-destructive/10 text-destructive" };
 
@@ -53,15 +54,14 @@ const GamesPage = () => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
           {filtered.map((game, idx) => (
-            <motion.a
+            <motion.button
               key={game.id}
-              href={gameUrls[game.id] || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
+              type="button"
+              onClick={() => navigate(`/game/${game.id}`)}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: idx * 0.04 }}
-              className="bg-card border border-border rounded-xl p-5 hover:shadow-elevated transition group block"
+              className="bg-card border border-border rounded-xl p-5 hover:shadow-elevated transition group block text-left"
             >
               <div className="flex items-start justify-between">
                 <span className="text-4xl">{game.emoji}</span>
@@ -73,7 +73,7 @@ const GamesPage = () => {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${diffColors[game.difficulty]}`}>{game.difficulty}</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{game.category}</span>
               </div>
-            </motion.a>
+            </motion.button>
           ))}
         </div>
       </div>
@@ -84,12 +84,55 @@ const GamesPage = () => {
 
 export const GamePlayPage = () => {
   const navigate = useNavigate();
+  const { gameId } = useParams();
+  const game = games.find((item) => item.id === gameId);
+  const builtInGame = gameId ? <InAppGameArena gameId={gameId} /> : null;
+  const fallbackUrl = gameId ? gameUrls[gameId] : undefined;
+
+  if (!game) {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-foreground">Game not found</div>;
+  }
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="text-center">
-        <p className="text-foreground mb-4">Games open in a new tab!</p>
-        <button onClick={() => navigate("/games")} className="px-4 py-2 rounded-lg gradient-hero text-primary-foreground">Back to Games</button>
+    <div className="min-h-screen bg-background pb-24">
+      <div className="max-w-5xl mx-auto px-4 pt-6 space-y-5">
+        <button onClick={() => navigate("/games")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition">
+          <ArrowLeft className="w-4 h-4" /> Back to Games
+        </button>
+
+        <div className="rounded-3xl border border-border bg-card p-5 shadow-elevated">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-primary">In-app game room</p>
+              <h1 className="mt-1 text-2xl font-display font-bold text-foreground">{game.emoji} {game.title}</h1>
+              <p className="mt-2 text-sm text-muted-foreground">{game.description}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <span className={`rounded-full px-3 py-1 text-xs font-medium ${diffColors[game.difficulty]}`}>{game.difficulty}</span>
+              <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">{game.category}</span>
+            </div>
+          </div>
+        </div>
+
+        {builtInGame || (
+          <div className="rounded-3xl border border-border bg-card p-4 shadow-card">
+            {fallbackUrl ? (
+              <iframe
+                src={fallbackUrl}
+                title={game.title}
+                className="h-[70vh] w-full rounded-2xl border border-border bg-background"
+                loading="lazy"
+                referrerPolicy="strict-origin-when-cross-origin"
+              />
+            ) : (
+              <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+                This game is being prepared for in-app play.
+              </div>
+            )}
+          </div>
+        )}
       </div>
+      <BottomNav />
     </div>
   );
 };

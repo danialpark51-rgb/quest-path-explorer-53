@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { ArrowLeft, CheckCircle, Circle, PlayCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import EmbeddedVideoLibrary from "@/components/EmbeddedVideoLibrary";
-import { getSkillLessonVideoRecommendations, getSkillLessonVideoUrl, skillOverviewVideoMap } from "@/data/videoRecommendations";
+import { getSkillLessonVideoRecommendations, skillOverviewVideoMap } from "@/data/videoRecommendations";
 
 const SkillDetailPage = () => {
   const { skillId } = useParams();
