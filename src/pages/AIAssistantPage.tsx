@@ -1,13 +1,26 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Send, Bot, User, Loader2 } from "lucide-react";
+import { ArrowLeft, Send, Bot, User, Loader2, Mic, MicOff } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import BottomNav from "@/components/BottomNav";
 import { useLanguage } from "@/context/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
+import TextToSpeechPlayer from "@/components/TextToSpeechPlayer";
 
 type Message = { role: "user" | "assistant"; content: string };
+
+type SpeechRecognitionInstance = {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  onresult: ((event: any) => void) | null;
+  onerror: (() => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+};
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionInstance;
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 
@@ -19,11 +32,52 @@ const AIAssistantPage = () => {
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
+  const lastAssistantMessage = [...messages].reverse().find((message) => message.role === "assistant")?.content ?? "";
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  useEffect(() => {
+    return () => recognitionRef.current?.stop();
+  }, []);
+
+  const handleVoiceInput = () => {
+    if (typeof window === "undefined") return;
+
+    const SpeechRecognitionAPI = ((window as Window & {
+      SpeechRecognition?: SpeechRecognitionConstructor;
+      webkitSpeechRecognition?: SpeechRecognitionConstructor;
+    }).SpeechRecognition ||
+      (window as Window & { webkitSpeechRecognition?: SpeechRecognitionConstructor }).webkitSpeechRecognition) as
+      | SpeechRecognitionConstructor
+      | undefined;
+
+    if (!SpeechRecognitionAPI) return;
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-IN";
+    recognition.onresult = (event) => {
+      const spokenText = event.results?.[0]?.[0]?.transcript ?? "";
+      setInput((prev) => `${prev} ${spokenText}`.trim());
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognitionRef.current = recognition;
+    recognition.start();
+    setIsListening(true);
+  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -115,6 +169,7 @@ const AIAssistantPage = () => {
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="max-w-2xl mx-auto space-y-3">
+          {lastAssistantMessage && <TextToSpeechPlayer text={lastAssistantMessage} title="Listen to the latest AI reply" />}
           {messages.map((msg, idx) => (
             <motion.div
               key={idx}
@@ -170,6 +225,14 @@ const AIAssistantPage = () => {
             className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition"
             disabled={isLoading}
           />
+          <button
+            onClick={handleVoiceInput}
+            type="button"
+            className="w-11 h-11 rounded-xl bg-secondary flex items-center justify-center text-secondary-foreground hover:opacity-90 transition"
+            aria-label={isListening ? "Stop voice input" : "Start voice input"}
+          >
+            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}

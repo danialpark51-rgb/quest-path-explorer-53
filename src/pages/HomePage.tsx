@@ -105,7 +105,7 @@ const HomePage = () => {
           <Section icon={<Play className="w-5 h-5" />} title={t("recommended_videos")} action={t("see_all")} onAction={() => navigate(`/goal/${currentGoal.id}`)}>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
               {currentGoal.videos.slice(0, 5).map((v, i) => (
-                <a key={i} href={v.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0 w-52 group">
+                <button key={i} type="button" onClick={() => navigate(`/goal/${currentGoal.id}`)} className="flex-shrink-0 w-52 group text-left">
                   <div className="relative rounded-xl overflow-hidden bg-muted aspect-video mb-2">
                     <img src={v.thumbnail} alt={v.title} className="w-full h-full object-cover" loading="lazy"
                       onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
@@ -115,7 +115,7 @@ const HomePage = () => {
                     <span className="absolute bottom-1 right-1 bg-foreground/70 text-primary-foreground text-xs px-1.5 py-0.5 rounded">{v.duration}</span>
                   </div>
                   <p className="text-sm font-medium text-foreground line-clamp-2">{v.title}</p>
-                </a>
+                </button>
               ))}
             </div>
           </Section>
@@ -186,7 +186,7 @@ const HomePage = () => {
         <Section icon={<Headphones className="w-5 h-5" />} title={t("audio_stories")} action={t("all_stories")} onAction={() => navigate("/stories")}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
             {audioStories.slice(0, 6).map((story) => (
-              <div key={story.id} onClick={() => navigate("/stories")} className="flex-shrink-0 w-40 bg-card rounded-xl border border-border p-3 cursor-pointer hover:shadow-card transition">
+              <div key={story.id} onClick={() => navigate(`/stories?story=${story.id}`)} className="flex-shrink-0 w-40 bg-card rounded-xl border border-border p-3 cursor-pointer hover:shadow-card transition">
                 <span className="text-3xl">{story.emoji}</span>
                 <h4 className="text-sm font-semibold text-foreground mt-2 line-clamp-2">{story.title}</h4>
                 <p className="text-xs text-muted-foreground mt-1">{story.duration}</p>

@@ -1,4 +1,3 @@
-import { getYouTubeSearchUrl } from "@/lib/youtube";
 import { goals } from "@/data/goals";
 
 export const storyVideoMap: Record<string, string> = {
@@ -190,21 +189,47 @@ export type VideoResource = {
 };
 
 export const getStoryVideoUrl = (storyId: string, storyTitle: string) => {
-  return storyVideoMap[storyId] ?? getYouTubeSearchUrl(`${storyTitle} explained for students`);
+  return storyVideoMap[storyId] ?? "";
 };
 
 export const getSkillLessonVideoUrl = (skillId: string, skillTitle: string, lessonId: number, lessonTitle: string) => {
-  return skillLessonVideoMap[skillId]?.[lessonId] ?? getYouTubeSearchUrl(`${skillTitle} ${lessonTitle} lesson for students`);
+  return skillLessonVideoMap[skillId]?.[lessonId] ?? skillOverviewVideoMap[skillId] ?? "";
 };
 
-export const getSkillLessonVideoRecommendations = (skillTitle: string, lessonTitle: string): VideoResource[] => {
-  const base = `${skillTitle} ${lessonTitle}`;
+export type EmbeddedVideoResource = {
+  label: string;
+  title: string;
+  url: string;
+};
 
-  return [
-    { label: "Explanation", url: getYouTubeSearchUrl(`${base} explained for students`) },
-    { label: "Examples", url: getYouTubeSearchUrl(`${base} examples tutorial`) },
-    { label: "Practice", url: getYouTubeSearchUrl(`${base} practice questions`) },
-  ];
+export const getSkillLessonVideoRecommendations = (
+  skillId: string,
+  skillTitle: string,
+  lessonId: number,
+  lessonTitle: string,
+): EmbeddedVideoResource[] => {
+  const lessonMap = skillLessonVideoMap[skillId] ?? {};
+  const orderedLessonIds = Object.keys(lessonMap)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const currentIndex = orderedLessonIds.indexOf(lessonId);
+  const candidateIds = [lessonId, orderedLessonIds[currentIndex - 1], orderedLessonIds[currentIndex + 1]].filter(
+    (value): value is number => typeof value === "number",
+  );
+
+  const lessonVideos = candidateIds
+    .map((id, index) => ({
+      label: index === 0 ? "Selected lesson" : index === 1 ? "Related lesson" : "Next lesson",
+      title: index === 0 ? lessonTitle : `${skillTitle} related topic`,
+      url: lessonMap[id],
+    }))
+    .filter((video) => Boolean(video.url));
+
+  const overviewVideo = skillOverviewVideoMap[skillId]
+    ? [{ label: "Module overview", title: `${skillTitle} overview`, url: skillOverviewVideoMap[skillId] }]
+    : [];
+
+  return [...lessonVideos, ...overviewVideo];
 };
 
 export type DailyTaskResource = {

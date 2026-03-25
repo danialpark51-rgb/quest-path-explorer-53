@@ -1,13 +1,15 @@
 import { useMemo, useState } from "react";
 import { audioStories } from "@/data/audioStories";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, BookOpen, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import TextToSpeechPlayer from "@/components/TextToSpeechPlayer";
 
 const StoriesPage = () => {
   const navigate = useNavigate();
-  const [selectedStoryId, setSelectedStoryId] = useState(audioStories[0]?.id ?? null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [selectedStoryId, setSelectedStoryId] = useState(searchParams.get("story") ?? audioStories[0]?.id ?? null);
   const [filter, setFilter] = useState("All");
   const [expanded, setExpanded] = useState(true);
 
@@ -49,7 +51,10 @@ const StoriesPage = () => {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.04 }}
-                  onClick={() => setSelectedStoryId(story.id)}
+                  onClick={() => {
+                    setSelectedStoryId(story.id);
+                    setSearchParams({ story: story.id });
+                  }}
                   className={`w-full rounded-2xl border p-4 text-left transition ${active ? "border-primary bg-primary/5 shadow-card" : "border-border bg-card hover:shadow-card"}`}
                 >
                   <div className="flex items-start gap-3">
@@ -90,6 +95,7 @@ const StoriesPage = () => {
                       <p className="text-sm font-semibold text-foreground">{selectedStory.duration}</p>
                     </div>
                   </div>
+                  <TextToSpeechPlayer text={selectedStory.content} title={`Listen to ${selectedStory.title}`} />
                 </div>
 
                 {/* Full Content */}

@@ -2,10 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { goals } from "@/data/goals";
 import { quizzes } from "@/data/quizzes";
 import { useLanguage } from "@/context/LanguageContext";
-import { motion } from "framer-motion";
 import { ArrowLeft, Play, Star, Briefcase, TrendingUp, BookOpen, Trophy } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
-import YouTubeEmbed, { YouTubePreviewCard } from "@/components/YouTubeEmbed";
+import EmbeddedVideoLibrary from "@/components/EmbeddedVideoLibrary";
 
 const GoalDetailPage = () => {
   const { goalId } = useParams();
@@ -89,26 +88,14 @@ const GoalDetailPage = () => {
           <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
             <Play className="w-5 h-5 text-primary" /> {t("video_library")} ({goal.videos.length})
           </h2>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {goal.videos.slice(0, 4).map((v, i) => (
-              <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-                <YouTubeEmbed url={v.url} title={v.title} compact />
-              </motion.div>
-            ))}
-          </div>
-
-          {goal.videos.length > 4 && (
-            <div className="mt-4">
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">More goal videos</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {goal.videos.slice(4).map((v, i) => (
-                  <motion.div key={`${v.title}-${i}`} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}>
-                    <YouTubePreviewCard url={v.url} title={v.title} />
-                  </motion.div>
-                ))}
-              </div>
-            </div>
-          )}
+          <EmbeddedVideoLibrary
+            videos={goal.videos.map((video, index) => ({
+              label: index < 4 ? "Featured" : "More videos",
+              title: video.title,
+              url: video.url,
+            }))}
+            emptyMessage="No goal videos are available right now."
+          />
         </div>
       </div>
 

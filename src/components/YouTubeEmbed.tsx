@@ -6,9 +6,10 @@ type YouTubeEmbedProps = {
   url: string;
   title: string;
   compact?: boolean;
+  showExternalLink?: boolean;
 };
 
-const YouTubeEmbed = ({ url, title, compact = false }: YouTubeEmbedProps) => {
+const YouTubeEmbed = ({ url, title, compact = false, showExternalLink = true }: YouTubeEmbedProps) => {
   const embedUrl = getYouTubeEmbedUrl(url);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -58,14 +59,16 @@ const YouTubeEmbed = ({ url, title, compact = false }: YouTubeEmbedProps) => {
               >
                 <PlayCircle className="h-4 w-4" /> Play video
               </button>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-background/90 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-background"
-              >
-                <ExternalLink className="h-4 w-4" /> Open on YouTube
-              </a>
+              {showExternalLink && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-full bg-background/90 px-4 py-2 text-sm font-medium text-foreground transition hover:bg-background"
+                >
+                  <ExternalLink className="h-4 w-4" /> Open on YouTube
+                </a>
+              )}
             </div>
           </div>
         )}
@@ -76,14 +79,16 @@ const YouTubeEmbed = ({ url, title, compact = false }: YouTubeEmbedProps) => {
             <h3 className="font-semibold text-foreground">{title}</h3>
             <p className="text-sm text-muted-foreground">Watch inside the app or open on YouTube</p>
           </div>
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
-          >
-            <ExternalLink className="h-3.5 w-3.5" /> Open
-          </a>
+          {showExternalLink && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition hover:opacity-90"
+            >
+              <ExternalLink className="h-3.5 w-3.5" /> Open
+            </a>
+          )}
         </div>
       )}
     </div>
