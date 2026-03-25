@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, CheckCircle, XCircle } from "lucide-react";
+import { ArrowLeft, Eye, CheckCircle, XCircle, Briefcase, Heart, Move } from "lucide-react";
 import { observationImages, ObservationImage } from "@/data/observations";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -22,9 +22,7 @@ const ObservationPage = () => {
   const handleAddItem = () => {
     if (!input.trim()) return;
     const item = input.trim().toLowerCase();
-    if (!userAnswers.includes(item)) {
-      setUserAnswers([...userAnswers, item]);
-    }
+    if (!userAnswers.includes(item)) setUserAnswers([...userAnswers, item]);
     setInput("");
   };
 
@@ -67,18 +65,11 @@ const ObservationPage = () => {
               <p className="text-sm text-muted-foreground mb-4">
                 🔍 Observe the image carefully and list as many things as you can see!
               </p>
-
               <div className="flex gap-2 mb-4">
-                <input
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && handleAddItem()}
-                  placeholder="Type an object you see..."
-                  className="flex-1 px-4 py-2 rounded-xl bg-card border border-border text-foreground text-sm"
-                />
-                <button onClick={handleAddItem} className="px-4 py-2 rounded-xl gradient-hero text-primary-foreground text-sm font-medium">Add</button>
+                <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && handleAddItem()}
+                  placeholder="Type an object you see..." className="flex-1 px-4 py-2 rounded-xl bg-card border border-border text-foreground text-sm" />
+                <button onClick={handleAddItem} className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-medium">Add</button>
               </div>
-
               <div className="flex flex-wrap gap-2 mb-4">
                 {userAnswers.map((a, i) => (
                   <span key={i} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm flex items-center gap-1">
@@ -87,43 +78,88 @@ const ObservationPage = () => {
                   </span>
                 ))}
               </div>
-
               {userAnswers.length > 0 && (
-                <button onClick={handleSubmit} className="w-full py-3 rounded-xl gradient-hero text-primary-foreground font-semibold">
+                <button onClick={handleSubmit} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">
                   Submit ({userAnswers.length} items)
                 </button>
               )}
             </>
           ) : (
-            <div>
-              <div className="bg-card border border-border rounded-xl p-4 mb-4">
+            <div className="space-y-5">
+              <div className="bg-card border border-border rounded-xl p-4">
                 <p className="text-lg font-bold text-foreground mb-2">
                   {correctAnswers.length}/{selectedImage.items.length} items found!
                 </p>
                 <p className="text-sm text-muted-foreground">You earned {correctAnswers.length * 2} XP</p>
               </div>
 
-              <h3 className="font-display font-bold text-foreground mb-2">Your Answers:</h3>
-              <div className="space-y-1 mb-4">
-                {userAnswers.map((a, i) => {
-                  const isCorrect = selectedImage.items.some(item => item.toLowerCase().includes(a) || a.includes(item.toLowerCase()));
-                  return (
-                    <div key={i} className="flex items-center gap-2 text-sm">
-                      {isCorrect ? <CheckCircle className="w-4 h-4 text-primary" /> : <XCircle className="w-4 h-4 text-destructive" />}
-                      <span className={isCorrect ? "text-primary" : "text-muted-foreground"}>{a}</span>
-                    </div>
-                  );
-                })}
+              <div>
+                <h3 className="font-display font-bold text-foreground mb-2">Your Answers:</h3>
+                <div className="space-y-1 mb-4">
+                  {userAnswers.map((a, i) => {
+                    const isCorrect = selectedImage.items.some(item => item.toLowerCase().includes(a) || a.includes(item.toLowerCase()));
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        {isCorrect ? <CheckCircle className="w-4 h-4 text-primary" /> : <XCircle className="w-4 h-4 text-destructive" />}
+                        <span className={isCorrect ? "text-primary" : "text-muted-foreground"}>{a}</span>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
-              <h3 className="font-display font-bold text-foreground mb-2">All Items in Image:</h3>
-              <div className="flex flex-wrap gap-2">
-                {selectedImage.items.map((item, i) => (
-                  <span key={i} className="bg-muted text-foreground px-3 py-1 rounded-full text-sm">{item}</span>
-                ))}
+              <div>
+                <h3 className="font-display font-bold text-foreground mb-2">All Items in Image:</h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImage.items.map((item, i) => (
+                    <span key={i} className="bg-muted text-foreground px-3 py-1 rounded-full text-sm">{item}</span>
+                  ))}
+                </div>
               </div>
 
-              <button onClick={handleBack} className="w-full mt-6 py-3 rounded-xl gradient-hero text-primary-foreground font-semibold">
+              {/* Image Description */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-display font-bold text-foreground mb-2">📖 About This Image</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{selectedImage.description}</p>
+              </div>
+
+              {/* Emotions */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-display font-bold text-foreground mb-2 flex items-center gap-2">
+                  <Heart className="w-4 h-4 text-destructive" /> Emotions & Feelings
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImage.emotions.map((e, i) => (
+                    <span key={i} className="bg-destructive/10 text-destructive px-3 py-1 rounded-full text-sm">{e}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Related Jobs */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-display font-bold text-foreground mb-2 flex items-center gap-2">
+                  <Briefcase className="w-4 h-4 text-primary" /> Related Jobs & Careers
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImage.jobs.map((j, i) => (
+                    <span key={i} className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm">{j}</span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Movements */}
+              <div className="bg-card border border-border rounded-xl p-4">
+                <h3 className="font-display font-bold text-foreground mb-2 flex items-center gap-2">
+                  <Move className="w-4 h-4 text-accent" /> Actions & Movements
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {selectedImage.movements.map((m, i) => (
+                    <span key={i} className="bg-accent/10 text-accent px-3 py-1 rounded-full text-sm">{m}</span>
+                  ))}
+                </div>
+              </div>
+
+              <button onClick={handleBack} className="w-full py-3 rounded-xl bg-primary text-primary-foreground font-semibold">
                 Try Another Image
               </button>
             </div>
