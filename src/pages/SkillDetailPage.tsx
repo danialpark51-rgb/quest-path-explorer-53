@@ -3,9 +3,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import { skills } from "@/data/skills";
 import { useUser } from "@/context/UserContext";
 import { motion } from "framer-motion";
-import { ArrowLeft, CheckCircle, Circle, ExternalLink, PlayCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, Circle, PlayCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
-import YouTubeEmbed from "@/components/YouTubeEmbed";
+import EmbeddedVideoLibrary from "@/components/EmbeddedVideoLibrary";
 import { getSkillLessonVideoRecommendations, getSkillLessonVideoUrl, skillOverviewVideoMap } from "@/data/videoRecommendations";
 
 const SkillDetailPage = () => {
@@ -18,8 +18,7 @@ const SkillDetailPage = () => {
   if (!skill) return <div className="min-h-screen flex items-center justify-center text-foreground">Skill not found</div>;
 
   const selectedLesson = skill.lessons.find((lesson) => lesson.id === selectedLessonId) ?? skill.lessons[0];
-  const selectedLessonVideoUrl = getSkillLessonVideoUrl(skill.id, skill.title, selectedLesson.id, selectedLesson.title);
-  const selectedLessonRecommendations = getSkillLessonVideoRecommendations(skill.title, selectedLesson.title);
+  const selectedLessonRecommendations = getSkillLessonVideoRecommendations(skill.id, skill.title, selectedLesson.id, selectedLesson.title);
 
   const handleComplete = (lessonId: number) => {
     const lid = `${skill.id}-${lessonId}`;
@@ -52,30 +51,18 @@ const SkillDetailPage = () => {
               <p className="text-sm font-medium text-primary">Selected lesson</p>
               <h2 className="font-display text-xl font-bold text-foreground">{selectedLesson.title}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Watch the selected lesson video below, then use the extra topic links for explanation, examples, and practice.
+                Every video for this lesson stays inside the app so you can learn without leaving the module.
               </p>
             </div>
           </div>
-          <YouTubeEmbed url={selectedLessonVideoUrl} title={`${selectedLesson.title} lesson video`} compact />
-          <div className="mt-3 flex flex-wrap gap-2">
-            {selectedLessonRecommendations.map((resource) => (
-              <a
-                key={resource.label}
-                href={resource.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> {resource.label}
-              </a>
-            ))}
-          </div>
-          <div className="mt-3 rounded-2xl border border-border bg-muted/40 p-3">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">Module overview</p>
-            <div className="mt-2">
-              <YouTubeEmbed url={skillOverviewVideoMap[skill.id]} title={`${skill.title} overview`} compact />
-            </div>
-          </div>
+          <EmbeddedVideoLibrary
+            videos={selectedLessonRecommendations.length > 0 ? selectedLessonRecommendations : [{
+              label: "Module overview",
+              title: `${skill.title} overview`,
+              url: skillOverviewVideoMap[skill.id],
+            }]}
+            emptyMessage="Lesson videos will appear here once they are mapped."
+          />
         </div>
 
         {levels.map((level) => {
@@ -114,14 +101,13 @@ const SkillDetailPage = () => {
                         >
                           {done ? "Completed" : "Mark complete"}
                         </button>
-                        <a
-                          href={getSkillLessonVideoUrl(skill.id, skill.title, lesson.id, lesson.title)}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLessonId(lesson.id)}
                           className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
                         >
                           <PlayCircle className="w-3.5 h-3.5" /> Topic video
-                        </a>
+                        </button>
                       </div>
                     </motion.div>
                   );
