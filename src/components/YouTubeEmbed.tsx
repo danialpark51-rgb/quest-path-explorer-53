@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink, PlayCircle } from "lucide-react";
+import { ExternalLink, PlayCircle, AlertTriangle } from "lucide-react";
 import { getYouTubeEmbedUrl, getYouTubeThumbnailUrl } from "@/lib/youtube";
 
 type YouTubeEmbedProps = {
@@ -12,6 +12,7 @@ type YouTubeEmbedProps = {
 const YouTubeEmbed = ({ url, title, compact = false, showExternalLink = true }: YouTubeEmbedProps) => {
   const embedUrl = getYouTubeEmbedUrl(url);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
 
   if (!embedUrl) {
     return (
@@ -21,8 +22,8 @@ const YouTubeEmbed = ({ url, title, compact = false, showExternalLink = true }: 
         rel="noopener noreferrer"
         className="group block overflow-hidden rounded-2xl border border-border bg-card transition hover:shadow-card"
       >
-        <div className="relative aspect-video overflow-hidden bg-muted">
-          <img src="/placeholder.svg" alt={title} className="h-full w-full object-cover" loading="lazy" />
+        <div className="relative aspect-video overflow-hidden bg-muted flex items-center justify-center">
+          <AlertTriangle className="h-8 w-8 text-muted-foreground" />
         </div>
         <div className="flex items-center justify-between gap-3 p-4">
           <div>
@@ -50,7 +51,19 @@ const YouTubeEmbed = ({ url, title, compact = false, showExternalLink = true }: 
           />
         ) : (
           <div className="relative h-full w-full">
-            <img src={getYouTubeThumbnailUrl(url)} alt={title} className="h-full w-full object-cover" loading="lazy" />
+            {!thumbError ? (
+              <img
+                src={getYouTubeThumbnailUrl(url)}
+                alt={title}
+                className="h-full w-full object-cover"
+                loading="lazy"
+                onError={() => setThumbError(true)}
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-muted">
+                <PlayCircle className="h-12 w-12 text-muted-foreground" />
+              </div>
+            )}
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-foreground/45 px-4 text-center">
               <button
                 type="button"
@@ -95,24 +108,40 @@ const YouTubeEmbed = ({ url, title, compact = false, showExternalLink = true }: 
   );
 };
 
-export const YouTubePreviewCard = ({ url, title }: { url: string; title: string }) => (
-  <a
-    href={url}
-    target="_blank"
-    rel="noopener noreferrer"
-    className="group block overflow-hidden rounded-2xl border border-border bg-card transition hover:shadow-card"
-  >
-    <div className="relative aspect-video overflow-hidden bg-muted">
-      <img src={getYouTubeThumbnailUrl(url)} alt={title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" loading="lazy" />
-      <div className="absolute inset-0 flex items-center justify-center bg-foreground/10 opacity-0 transition group-hover:opacity-100">
-        <PlayCircle className="h-12 w-12 text-primary-foreground" />
+export const YouTubePreviewCard = ({ url, title }: { url: string; title: string }) => {
+  const [thumbError, setThumbError] = useState(false);
+
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block overflow-hidden rounded-2xl border border-border bg-card transition hover:shadow-card"
+    >
+      <div className="relative aspect-video overflow-hidden bg-muted">
+        {!thumbError ? (
+          <img
+            src={getYouTubeThumbnailUrl(url)}
+            alt={title}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+            loading="lazy"
+            onError={() => setThumbError(true)}
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-muted">
+            <PlayCircle className="h-12 w-12 text-muted-foreground" />
+          </div>
+        )}
+        <div className="absolute inset-0 flex items-center justify-center bg-foreground/10 opacity-0 transition group-hover:opacity-100">
+          <PlayCircle className="h-12 w-12 text-primary-foreground" />
+        </div>
       </div>
-    </div>
-    <div className="flex items-center justify-between gap-3 p-4">
-      <h3 className="line-clamp-2 text-sm font-semibold text-foreground">{title}</h3>
-      <ExternalLink className="h-4 w-4 flex-shrink-0 text-primary" />
-    </div>
-  </a>
-);
+      <div className="flex items-center justify-between gap-3 p-4">
+        <h3 className="line-clamp-2 text-sm font-semibold text-foreground">{title}</h3>
+        <ExternalLink className="h-4 w-4 flex-shrink-0 text-primary" />
+      </div>
+    </a>
+  );
+};
 
 export default YouTubeEmbed;
