@@ -1,6 +1,8 @@
 import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
+import path from "path";
+import { existsSync } from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -30,5 +32,23 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.use("/api", router);
+
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction) {
+  const staticDir = path.join(process.cwd(), "artifacts/eduapp/dist/public");
+
+  if (existsSync(staticDir)) {
+    app.use(express.static(staticDir));
+
+    app.get(/.*/, (_req, res) => {
+      res.sendFile(path.join(staticDir, "index.html"));
+    });
+
+    logger.info({ staticDir }, "Serving frontend static files");
+  } else {
+    logger.warn({ staticDir }, "Frontend build not found — static serving skipped");
+  }
+}
 
 export default app;
