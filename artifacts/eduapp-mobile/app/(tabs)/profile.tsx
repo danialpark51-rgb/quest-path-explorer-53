@@ -214,7 +214,7 @@ function makeStyles(colors: ReturnType<typeof useColors>) {
     changeText: { fontSize: 12, fontFamily: "Inter_600SemiBold", color: colors.primary },
     infoCard: {
       backgroundColor: colors.card, borderRadius: 16, paddingHorizontal: 16,
-      borderWidth: 1, borderColor: colors.border, divideY: 1,
+      borderWidth: 1, borderColor: colors.border,
     },
     logoutBtn: {
       marginTop: 24, backgroundColor: colors.destructive + "12", borderRadius: 14,
