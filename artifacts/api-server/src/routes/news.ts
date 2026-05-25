@@ -74,7 +74,6 @@ router.get("/news", async (req, res) => {
       q: query,
       language: "en",
       category: "education,science,technology,health,sports",
-      size: "20",
     });
 
     const upstream = await fetch(

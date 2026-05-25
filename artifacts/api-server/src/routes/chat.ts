@@ -23,81 +23,29 @@ router.post("/chat", async (req, res) => {
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GOOGLE_AI_API_KEY;
 
-  if (openaiKey) {
-    await handleOpenAI(messages, openaiKey, res);
-  } else if (geminiKey) {
-    await handleGemini(messages, geminiKey, res);
-  } else {
-    res.status(503).json({ error: "AI service is not configured." });
+  if (geminiKey) {
+    const ok = await tryGemini(messages, geminiKey, res);
+    if (ok) return;
   }
+
+  if (openaiKey) {
+    const isOpenRouter = openaiKey.startsWith("sk-or-");
+    const baseUrl = isOpenRouter
+      ? "https://openrouter.ai/api/v1"
+      : "https://api.openai.com/v1";
+    const model = isOpenRouter ? "openai/gpt-4o-mini" : "gpt-4o-mini";
+    await handleOpenAI(messages, openaiKey, baseUrl, model, res);
+    return;
+  }
+
+  res.status(503).json({ error: "AI service is not configured." });
 });
 
-async function handleOpenAI(
+async function tryGemini(
   messages: { role: string; content: string }[],
   apiKey: string,
   res: import("express").Response,
-): Promise<void> {
-  try {
-    const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          ...messages,
-        ],
-        stream: true,
-        max_tokens: 1024,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!upstream.ok) {
-      const err = await upstream.json().catch(() => ({}));
-      res.status(upstream.status).json({ error: (err as { error?: { message?: string } }).error?.message ?? "OpenAI request failed" });
-      return;
-    }
-
-    res.setHeader("Content-Type", "text/event-stream");
-    res.setHeader("Cache-Control", "no-cache");
-    res.setHeader("X-Accel-Buffering", "no");
-
-    if (!upstream.body) {
-      res.status(500).json({ error: "No response body from OpenAI" });
-      return;
-    }
-
-    const reader = upstream.body.getReader();
-    const decoder = new TextDecoder();
-
-    const pump = async (): Promise<void> => {
-      const { done, value } = await reader.read();
-      if (done) {
-        res.write("data: [DONE]\n\n");
-        res.end();
-        return;
-      }
-      res.write(decoder.decode(value, { stream: true }));
-      return pump();
-    };
-
-    await pump();
-  } catch (_err) {
-    if (!res.headersSent) {
-      res.status(502).json({ error: "Failed to reach AI service" });
-    }
-  }
-}
-
-async function handleGemini(
-  messages: { role: string; content: string }[],
-  apiKey: string,
-  res: import("express").Response,
-): Promise<void> {
+): Promise<boolean> {
   try {
     const geminiMessages = messages.map((m) => ({
       role: m.role === "assistant" ? "model" : "user",
@@ -118,8 +66,7 @@ async function handleGemini(
     );
 
     if (!upstream.ok || !upstream.body) {
-      res.status(upstream.status).json({ error: "Gemini request failed" });
-      return;
+      return false;
     }
 
     res.setHeader("Content-Type", "text/event-stream");
@@ -164,9 +111,73 @@ async function handleGemini(
     };
 
     await pump();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function handleOpenAI(
+  messages: { role: string; content: string }[],
+  apiKey: string,
+  baseUrl: string,
+  model: string,
+  res: import("express").Response,
+): Promise<void> {
+  try {
+    const upstream = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...messages,
+        ],
+        stream: true,
+        max_tokens: 1024,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!upstream.ok) {
+      const err = await upstream.json().catch(() => ({}));
+      res.status(upstream.status).json({
+        error: (err as { error?: { message?: string } }).error?.message ?? "AI request failed",
+      });
+      return;
+    }
+
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("X-Accel-Buffering", "no");
+
+    if (!upstream.body) {
+      res.status(500).json({ error: "No response body from AI service" });
+      return;
+    }
+
+    const reader = upstream.body.getReader();
+    const decoder = new TextDecoder();
+
+    const pump = async (): Promise<void> => {
+      const { done, value } = await reader.read();
+      if (done) {
+        res.write("data: [DONE]\n\n");
+        res.end();
+        return;
+      }
+      res.write(decoder.decode(value, { stream: true }));
+      return pump();
+    };
+
+    await pump();
   } catch (_err) {
     if (!res.headersSent) {
-      res.status(502).json({ error: "Failed to reach Gemini service" });
+      res.status(502).json({ error: "Failed to reach AI service" });
     }
   }
 }
