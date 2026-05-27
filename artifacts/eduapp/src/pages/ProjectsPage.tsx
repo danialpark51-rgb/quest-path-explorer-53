@@ -1,9 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowLeft, Lightbulb, Plus, Heart, User, Clock, BookOpen, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  ArrowLeft, Lightbulb, Plus, Heart, User, Clock,
+  BookOpen, Search, SlidersHorizontal, MessageSquare,
+  Send, X, ChevronDown, ChevronUp, Zap,
+} from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 type Project = {
@@ -20,8 +24,17 @@ type Project = {
   createdAt: string;
 };
 
+type Comment = {
+  id: number;
+  projectId: number;
+  username: string;
+  fullName: string;
+  message: string;
+  createdAt: string;
+};
+
 const SUBJECTS = [
-  "Mathematics", "Science", "Physics", "Chemistry", "Biology",
+  "All", "Mathematics", "Science", "Physics", "Chemistry", "Biology",
   "Social Studies", "History", "Geography", "Computer Science",
   "Environmental Science", "Arts", "Language", "Other",
 ];
@@ -30,7 +43,7 @@ const SUBJECT_EMOJI: Record<string, string> = {
   Mathematics: "🔢", Science: "🔬", Physics: "⚡", Chemistry: "🧪",
   Biology: "🌱", "Social Studies": "🌍", History: "📜", Geography: "🗺️",
   "Computer Science": "💻", "Environmental Science": "🌿",
-  Arts: "🎨", Language: "📖", Other: "📌",
+  Arts: "🎨", Language: "📖", Other: "📌", All: "✨",
 };
 
 const GOAL_COLORS: Record<string, string> = {
@@ -42,6 +55,7 @@ const GOAL_COLORS: Record<string, string> = {
 
 const ProjectsPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useUser();
   const { t } = useLanguage();
 
@@ -50,24 +64,44 @@ const ProjectsPage = () => {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [search, setSearch] = useState("");
+  const [filterSubject, setFilterSubject] = useState("All");
+  const [sortBy, setSortBy] = useState<"newest" | "liked">("newest");
+  const [showFilters, setShowFilters] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem("eduapp-liked-projects") ?? "[]")); }
     catch { return new Set(); }
   });
-  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
-  const [form, setForm] = useState({ title: "", description: "", subject: SUBJECTS[0] });
+  // Pre-fill from Problem Finder
+  const [form, setForm] = useState<{ title: string; description: string; subject: string }>(() => {
+    if (searchParams.get("prefill")) {
+      try {
+        const saved = sessionStorage.getItem("eduapp-prefill-project");
+        if (saved) {
+          sessionStorage.removeItem("eduapp-prefill-project");
+          return { ...JSON.parse(saved) };
+        }
+      } catch { /* ignore */ }
+    }
+    return { title: "", description: "", subject: SUBJECTS[1] };
+  });
 
-  const fetchProjects = () => {
+  useEffect(() => {
+    if (searchParams.get("prefill")) setShowForm(true);
+  }, [searchParams]);
+
+  const fetchProjects = useCallback(() => {
     setLoading(true);
     fetch("/api/projects")
       .then((r) => r.json())
       .then((d: { projects: Project[] }) => setProjects(d.projects ?? []))
       .catch(() => setProjects([]))
       .finally(() => setLoading(false));
-  };
+  }, []);
 
-  useEffect(() => { fetchProjects(); }, []);
+  useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,7 +122,7 @@ const ProjectsPage = () => {
           school: user.school,
         }),
       });
-      setForm({ title: "", description: "", subject: SUBJECTS[0] });
+      setForm({ title: "", description: "", subject: SUBJECTS[1] });
       setShowForm(false);
       fetchProjects();
     } finally {
@@ -96,19 +130,31 @@ const ProjectsPage = () => {
     }
   };
 
-  const handleLike = async (id: number) => {
+  const handleLike = async (id: number, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (likedIds.has(id)) return;
     const newLiked = new Set(likedIds);
     newLiked.add(id);
     setLikedIds(newLiked);
     localStorage.setItem("eduapp-liked-projects", JSON.stringify([...newLiked]));
     setProjects((prev) => prev.map((p) => p.id === id ? { ...p, likes: p.likes + 1 } : p));
+    if (selectedProject?.id === id) setSelectedProject((p) => p ? { ...p, likes: p.likes + 1 } : p);
     await fetch(`/api/projects/${id}/like`, { method: "POST" });
   };
 
-  const displayed = tab === "mine"
-    ? projects.filter((p) => p.username === user?.username)
-    : projects;
+  // Filtering & sorting
+  const displayed = projects
+    .filter((p) => {
+      if (tab === "mine" && p.username !== user?.username) return false;
+      if (filterSubject !== "All" && p.subject !== filterSubject) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        return p.title.toLowerCase().includes(q) || p.description.toLowerCase().includes(q) ||
+          p.fullName.toLowerCase().includes(q) || p.subject.toLowerCase().includes(q);
+      }
+      return true;
+    })
+    .sort((a, b) => sortBy === "liked" ? b.likes - a.likes : new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -128,18 +174,27 @@ const ProjectsPage = () => {
                 <p className="text-sm text-primary-foreground/70">{t("proj.subtitle")}</p>
               </div>
             </div>
-            <button
-              onClick={() => setShowForm((v) => !v)}
-              className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-3 py-2 rounded-full transition"
-            >
-              <Plus className="w-4 h-4" />
-              {t("proj.add")}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => navigate("/problem-finder")}
+                className="flex items-center gap-1.5 bg-orange-400/20 hover:bg-orange-400/30 text-orange-300 text-xs font-medium px-3 py-2 rounded-full transition"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                {t("pf.find_short")}
+              </button>
+              <button
+                onClick={() => setShowForm((v) => !v)}
+                className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 text-white text-sm font-medium px-3 py-2 rounded-full transition"
+              >
+                <Plus className="w-4 h-4" />
+                {t("proj.add")}
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 -mt-4 space-y-4">
+      <div className="max-w-2xl mx-auto px-4 -mt-4 space-y-3">
         {/* Create Form */}
         <AnimatePresence>
           {showForm && (
@@ -149,45 +204,29 @@ const ProjectsPage = () => {
               className="bg-card rounded-2xl border border-border p-5 shadow-card space-y-4"
             >
               <h2 className="font-display font-bold text-foreground">{t("proj.form_heading")}</h2>
-
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t("proj.form_title")}</label>
-                <input
-                  value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                  placeholder={t("proj.form_title_ph")}
-                  maxLength={100}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition"
-                  required
-                />
+                <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                  placeholder={t("proj.form_title_ph")} maxLength={100}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition" required />
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t("proj.form_subject")}</label>
-                <select
-                  value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition"
-                >
-                  {SUBJECTS.map((s) => <option key={s} value={s}>{SUBJECT_EMOJI[s]} {s}</option>)}
+                <select value={form.subject} onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition">
+                  {SUBJECTS.slice(1).map((s) => <option key={s} value={s}>{SUBJECT_EMOJI[s]} {s}</option>)}
                 </select>
               </div>
-
               <div>
                 <label className="text-xs font-semibold text-muted-foreground mb-1 block">{t("proj.form_desc")}</label>
-                <textarea
-                  value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  placeholder={t("proj.form_desc_ph")}
-                  rows={4} maxLength={1000}
-                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition resize-none"
-                  required
-                />
+                <textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+                  placeholder={t("proj.form_desc_ph")} rows={4} maxLength={1000}
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition resize-none" required />
                 <p className="text-xs text-muted-foreground text-right">{form.description.length}/1000</p>
               </div>
-
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowForm(false)}
-                  className="flex-1 rounded-xl border border-border py-2 text-sm text-muted-foreground hover:bg-muted transition">
-                  {t("proj.cancel")}
-                </button>
+                  className="flex-1 rounded-xl border border-border py-2 text-sm text-muted-foreground hover:bg-muted transition">{t("proj.cancel")}</button>
                 <button type="submit" disabled={submitting}
                   className="flex-1 rounded-xl bg-primary text-primary-foreground py-2 text-sm font-semibold hover:bg-primary/90 transition disabled:opacity-60">
                   {submitting ? t("proj.submitting") : t("proj.submit")}
@@ -196,6 +235,51 @@ const ProjectsPage = () => {
             </motion.form>
           )}
         </AnimatePresence>
+
+        {/* Search + Filter Bar */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                value={search} onChange={(e) => setSearch(e.target.value)}
+                placeholder={t("proj.search_ph")}
+                className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-border bg-card text-sm outline-none focus:border-primary transition"
+              />
+            </div>
+            <button onClick={() => setShowFilters((v) => !v)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 rounded-xl border text-sm font-medium transition ${showFilters ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground hover:border-primary/50 bg-card"}`}>
+              <SlidersHorizontal className="w-4 h-4" />
+              {t("proj.filter")}
+            </button>
+          </div>
+
+          {/* Filter Panel */}
+          <AnimatePresence>
+            {showFilters && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden">
+                <div className="bg-card rounded-xl border border-border p-3 space-y-2">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground font-medium">
+                    <span>{t("proj.filter_subject")}</span>
+                    <div className="flex gap-1">
+                      <button onClick={() => setSortBy("newest")} className={`px-2 py-0.5 rounded-full border text-xs transition ${sortBy === "newest" ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>{t("proj.sort_new")}</button>
+                      <button onClick={() => setSortBy("liked")} className={`px-2 py-0.5 rounded-full border text-xs transition ${sortBy === "liked" ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>{t("proj.sort_liked")}</button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {SUBJECTS.map((s) => (
+                      <button key={s} onClick={() => setFilterSubject(s)}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition ${filterSubject === s ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"}`}>
+                        {SUBJECT_EMOJI[s]} {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
 
         {/* Tabs */}
         <div className="flex gap-2 bg-muted rounded-xl p-1">
@@ -207,78 +291,60 @@ const ProjectsPage = () => {
           ))}
         </div>
 
+        {/* Stats Row */}
+        {!loading && (
+          <p className="text-xs text-muted-foreground px-1">
+            {displayed.length} {t("proj.count")}
+            {filterSubject !== "All" && <> · {filterSubject}</>}
+            {search && <> · "{search}"</>}
+          </p>
+        )}
+
         {/* Project List */}
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          </div>
+          <div className="flex justify-center py-12"><div className="w-8 h-8 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
         ) : displayed.length === 0 ? (
           <div className="text-center py-16 space-y-3">
             <Lightbulb className="w-12 h-12 text-muted-foreground/30 mx-auto" />
-            <p className="text-muted-foreground text-sm">
-              {tab === "mine" ? t("proj.empty_mine") : t("proj.empty_all")}
-            </p>
-            {tab === "mine" && (
-              <button onClick={() => setShowForm(true)} className="text-primary text-sm font-medium hover:underline">
-                {t("proj.be_first")}
-              </button>
-            )}
+            <p className="text-muted-foreground text-sm">{tab === "mine" ? t("proj.empty_mine") : t("proj.empty_all")}</p>
+            {tab === "mine" && <button onClick={() => setShowForm(true)} className="text-primary text-sm font-medium hover:underline">{t("proj.be_first")}</button>}
           </div>
         ) : (
           <div className="space-y-3">
             {displayed.map((proj, i) => {
-              const isExpanded = expandedId === proj.id;
               const isLiked = likedIds.has(proj.id);
               const isMine = proj.username === user?.username;
               return (
-                <motion.div
-                  key={proj.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.04 }}
-                  className="bg-card rounded-2xl border border-border shadow-card overflow-hidden"
-                >
+                <motion.div key={proj.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.03 }}
+                  className="bg-card rounded-2xl border border-border shadow-card overflow-hidden cursor-pointer hover:border-primary/30 transition"
+                  onClick={() => setSelectedProject(proj)}>
                   <div className="p-4">
-                    {/* Top row */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                    <div className="flex items-start justify-between gap-2 mb-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap mb-1">
                           <span className="text-lg">{SUBJECT_EMOJI[proj.subject] ?? "📌"}</span>
                           <h3 className="font-display font-bold text-foreground text-sm leading-snug">{proj.title}</h3>
                           {isMine && <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-medium">{t("proj.yours")}</span>}
                         </div>
-                        <div className="flex flex-wrap gap-2 items-center">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground`}>
-                            <BookOpen className="w-2.5 h-2.5 inline mr-0.5" />{proj.subject}
-                          </span>
+                        <div className="flex flex-wrap gap-1.5 items-center">
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-medium bg-muted text-muted-foreground"><BookOpen className="w-2.5 h-2.5 inline mr-0.5" />{proj.subject}</span>
                           {proj.goal && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${GOAL_COLORS[proj.goal] ?? "bg-muted text-muted-foreground"}`}>{proj.goal}</span>}
                           {proj.classStandard && <span className="text-[10px] text-muted-foreground">Class {proj.classStandard}</span>}
                         </div>
                       </div>
-                      <button onClick={() => handleLike(proj.id)} disabled={isLiked}
+                      <button onClick={(e) => handleLike(proj.id, e)} disabled={isLiked}
                         className={`flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-full border transition flex-shrink-0 ${isLiked ? "bg-red-50 border-red-200 text-red-500" : "border-border text-muted-foreground hover:text-red-500 hover:border-red-200"}`}>
                         <Heart className={`w-3.5 h-3.5 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
                         {proj.likes}
                       </button>
                     </div>
-
-                    {/* Description */}
-                    <p className={`text-sm text-muted-foreground leading-relaxed ${isExpanded ? "" : "line-clamp-2"}`}>
-                      {proj.description}
-                    </p>
-                    {proj.description.length > 120 && (
-                      <button onClick={() => setExpandedId(isExpanded ? null : proj.id)}
-                        className="text-xs text-primary mt-1 flex items-center gap-0.5 hover:underline">
-                        {isExpanded ? <><ChevronUp className="w-3 h-3" />{t("proj.less")}</> : <><ChevronDown className="w-3 h-3" />{t("proj.more")}</>}
-                      </button>
-                    )}
-
-                    {/* Footer */}
+                    <p className="text-sm text-muted-foreground leading-relaxed line-clamp-2">{proj.description}</p>
                     <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border">
                       <User className="w-3.5 h-3.5 text-muted-foreground" />
                       <span className="text-xs text-muted-foreground flex-1">{proj.fullName}</span>
+                      <span className="text-xs text-primary flex items-center gap-1"><MessageSquare className="w-3 h-3" />{t("proj.view_chat")}</span>
                       <Clock className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span className="text-xs text-muted-foreground">{new Date(proj.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>
+                      <span className="text-xs text-muted-foreground">{new Date(proj.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</span>
                     </div>
                   </div>
                 </motion.div>
@@ -289,7 +355,193 @@ const ProjectsPage = () => {
       </div>
 
       <BottomNav />
+
+      {/* Project Detail Modal */}
+      <AnimatePresence>
+        {selectedProject && (
+          <ProjectDetailModal
+            project={selectedProject}
+            user={user}
+            likedIds={likedIds}
+            onLike={handleLike}
+            onClose={() => setSelectedProject(null)}
+            t={t}
+          />
+        )}
+      </AnimatePresence>
     </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+// Project Detail Modal with Comments/Chat
+// ─────────────────────────────────────────────
+type ModalProps = {
+  project: Project;
+  user: { username: string; fullName: string } | null;
+  likedIds: Set<number>;
+  onLike: (id: number, e?: React.MouseEvent) => void;
+  onClose: () => void;
+  t: (key: string) => string;
+};
+
+const ProjectDetailModal = ({ project, user, likedIds, onLike, onClose, t }: ModalProps) => {
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(true);
+  const [message, setMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [showFull, setShowFull] = useState(false);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isLiked = likedIds.has(project.id);
+
+  const fetchComments = useCallback(() => {
+    fetch(`/api/projects/${project.id}/comments`)
+      .then((r) => r.json())
+      .then((d: { comments: Comment[] }) => setComments(d.comments ?? []))
+      .catch(() => {})
+      .finally(() => setLoadingComments(false));
+  }, [project.id]);
+
+  useEffect(() => {
+    fetchComments();
+    pollRef.current = setInterval(fetchComments, 8000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [fetchComments]);
+
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [comments]);
+
+  const sendComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !message.trim()) return;
+    setSending(true);
+    try {
+      await fetch(`/api/projects/${project.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, fullName: user.fullName, message: message.trim() }),
+      });
+      setMessage("");
+      fetchComments();
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+      onClick={onClose}
+    >
+      <motion.div
+        initial={{ y: "100%", opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: "100%", opacity: 0 }}
+        transition={{ type: "spring", damping: 30, stiffness: 300 }}
+        className="bg-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-2xl border border-border shadow-xl flex flex-col max-h-[92vh]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Modal Header */}
+        <div className="flex items-start justify-between p-4 border-b border-border flex-shrink-0">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <span className="text-2xl">{SUBJECT_EMOJI[project.subject] ?? "📌"}</span>
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display font-bold text-foreground text-sm leading-snug">{project.title}</h2>
+              <div className="flex flex-wrap gap-1.5 mt-1">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{project.subject}</span>
+                {project.goal && <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${GOAL_COLORS[project.goal] ?? "bg-muted text-muted-foreground"}`}>{project.goal}</span>}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-muted transition ml-2 flex-shrink-0">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable Body */}
+        <div className="overflow-y-auto flex-1 p-4 space-y-4">
+          {/* Description */}
+          <div>
+            <p className={`text-sm text-foreground leading-relaxed ${showFull ? "" : "line-clamp-4"}`}>{project.description}</p>
+            {project.description.length > 200 && (
+              <button onClick={() => setShowFull(!showFull)} className="text-xs text-primary mt-1 flex items-center gap-0.5">
+                {showFull ? <><ChevronUp className="w-3 h-3" />{t("proj.less")}</> : <><ChevronDown className="w-3 h-3" />{t("proj.more")}</>}
+              </button>
+            )}
+          </div>
+
+          {/* Author + Meta */}
+          <div className="flex items-center gap-3 py-3 border-y border-border">
+            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm flex-shrink-0">
+              {project.fullName[0]?.toUpperCase()}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-foreground">{project.fullName}</p>
+              <p className="text-xs text-muted-foreground">
+                {project.school || "Student"}{project.classStandard ? ` · Class ${project.classStandard}` : ""}
+              </p>
+            </div>
+            <button onClick={(e) => onLike(project.id, e)} disabled={isLiked}
+              className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border transition ${isLiked ? "bg-red-50 border-red-200 text-red-500" : "border-border text-muted-foreground hover:text-red-500"}`}>
+              <Heart className={`w-4 h-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
+              {project.likes}
+            </button>
+          </div>
+
+          {/* Comments Section */}
+          <div>
+            <h3 className="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-primary" />
+              {t("proj.discussion")} {!loadingComments && `(${comments.length})`}
+            </h3>
+
+            {loadingComments ? (
+              <div className="flex justify-center py-4"><div className="w-5 h-5 rounded-full border-2 border-primary border-t-transparent animate-spin" /></div>
+            ) : comments.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">{t("proj.no_comments")}</p>
+            ) : (
+              <div className="space-y-3">
+                {comments.map((c) => (
+                  <div key={c.id} className={`flex gap-2.5 ${c.username === user?.username ? "flex-row-reverse" : ""}`}>
+                    <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-muted-foreground flex-shrink-0">
+                      {c.fullName[0]?.toUpperCase()}
+                    </div>
+                    <div className={`max-w-[75%] ${c.username === user?.username ? "items-end" : "items-start"} flex flex-col`}>
+                      <p className="text-[10px] text-muted-foreground mb-0.5">{c.fullName}</p>
+                      <div className={`px-3 py-2 rounded-2xl text-sm ${c.username === user?.username ? "bg-primary text-primary-foreground rounded-tr-sm" : "bg-muted text-foreground rounded-tl-sm"}`}>
+                        {c.message}
+                      </div>
+                      <p className="text-[9px] text-muted-foreground mt-0.5">
+                        {new Date(c.createdAt).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                <div ref={commentsEndRef} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Comment Input */}
+        {user && (
+          <form onSubmit={sendComment} className="flex gap-2 p-3 border-t border-border flex-shrink-0 bg-card">
+            <input
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={t("proj.comment_ph")}
+              maxLength={500}
+              className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition"
+            />
+            <button type="submit" disabled={sending || !message.trim()}
+              className="w-9 h-9 rounded-xl bg-primary text-primary-foreground flex items-center justify-center disabled:opacity-50 flex-shrink-0 hover:bg-primary/90 transition">
+              <Send className="w-4 h-4" />
+            </button>
+          </form>
+        )}
+      </motion.div>
+    </motion.div>
   );
 };
 

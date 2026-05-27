@@ -5,6 +5,8 @@ import newsRouter from "./news";
 import schoolRouter from "./school";
 import leaderboardRouter from "./leaderboard";
 import projectsRouter from "./projects";
+import commentsRouter from "./comments";
+import problemFinderRouter from "./problemfinder";
 
 const router: IRouter = Router();
 
@@ -14,5 +16,7 @@ router.use(newsRouter);
 router.use(schoolRouter);
 router.use(leaderboardRouter);
 router.use(projectsRouter);
+router.use(commentsRouter);
+router.use(problemFinderRouter);
 
 export default router;

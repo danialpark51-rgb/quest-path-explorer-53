@@ -11,7 +11,7 @@ import { getDailyTaskResource } from "@/data/videoRecommendations";
 import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
-  Gamepad2, Eye, Globe, UserCircle2, Lightbulb,
+  Gamepad2, Eye, Globe, UserCircle2, Lightbulb, Zap,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -233,6 +233,16 @@ const HomePage = () => {
             <Trophy className="w-6 h-6 text-yellow-500" />
             <span className="text-sm font-semibold text-foreground">{t("lb.title")}</span>
             <span className="text-xs text-muted-foreground">{t("lb.subtitle")}</span>
+          </button>
+          <button onClick={() => navigate("/problem-finder")} className="col-span-2 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-card transition">
+            <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5 text-orange-500" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-foreground">{t("home.problem_finder")}</p>
+              <p className="text-xs text-muted-foreground">{t("home.pf_sub")}</p>
+            </div>
+            <div className="ml-auto text-orange-400 text-lg">→</div>
           </button>
         </div>
       </div>
