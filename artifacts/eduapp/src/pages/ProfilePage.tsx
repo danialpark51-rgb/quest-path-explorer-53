@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { Award, BookOpen, School, Target, UserCircle2, Globe } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
+import SchoolMap from "@/components/SchoolMap";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUser } from "@/context/UserContext";
 import { useLanguage, Language } from "@/context/LanguageContext";
@@ -55,6 +56,9 @@ const ProfilePage = () => {
           <InfoCard icon={<UserCircle2 className="h-5 w-5 text-primary" />} label={t("profile.usn")} value={user.usnOrSetsNo || t("profile.not_added")} />
           <InfoCard icon={<Target className="h-5 w-5 text-primary" />} label={t("profile.goal")} value={currentGoal ? `${currentGoal.emoji} ${currentGoal.title}` : t("profile.no_goal")} />
         </section>
+
+        {/* School Location Map */}
+        {user.school && <SchoolMap schoolName={user.school} />}
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
           <div className="mb-4 flex items-center gap-2">

@@ -81,3 +81,8 @@ externalPort = 8081
 [[ports]]
 localPort = 22450
 externalPort = 80
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_CLIENT_ID = "1049409999108-bkqde3mntr47p4e12bgl05sobrvk8vn7.apps.googleusercontent.com"
