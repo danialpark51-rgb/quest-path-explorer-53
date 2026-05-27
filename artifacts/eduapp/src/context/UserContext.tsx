@@ -39,11 +39,29 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const setUser = (u: UserData | null) => setUserState(u);
   const logout = () => setUserState(null);
+  const syncLeaderboard = (u: UserData) => {
+    fetch("/api/leaderboard/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: u.username,
+        fullName: u.fullName,
+        xp: u.xp,
+        level: u.level,
+        streak: u.streak,
+        goal: u.selectedGoal,
+        school: u.school,
+      }),
+    }).catch(() => {});
+  };
+
   const addXP = (amount: number) => {
     if (!user) return;
     const newXP = user.xp + amount;
     const newLevel = Math.floor(newXP / 100) + 1;
-    setUserState({ ...user, xp: newXP, level: newLevel });
+    const updated = { ...user, xp: newXP, level: newLevel };
+    setUserState(updated);
+    syncLeaderboard(updated);
   };
   const completeTask = (taskId: string) => {
     if (!user || user.completedTasks.includes(taskId)) return;

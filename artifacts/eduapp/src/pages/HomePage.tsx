@@ -11,7 +11,7 @@ import { getDailyTaskResource } from "@/data/videoRecommendations";
 import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
-  Gamepad2, Eye, Globe, UserCircle2,
+  Gamepad2, Eye, Globe, UserCircle2, Lightbulb,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -223,6 +223,16 @@ const HomePage = () => {
           <button onClick={() => navigate("/ai-assistant")} className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-2 hover:shadow-card transition">
             <MessageCircle className="w-6 h-6 text-primary" />
             <span className="text-sm font-semibold text-foreground">{t("home.ai_assistant")}</span>
+          </button>
+          <button onClick={() => navigate("/projects")} className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-2 hover:shadow-card transition">
+            <Lightbulb className="w-6 h-6 text-yellow-500" />
+            <span className="text-sm font-semibold text-foreground">{t("home.projects")}</span>
+            <span className="text-xs text-muted-foreground">{t("home.projects_sub")}</span>
+          </button>
+          <button onClick={() => navigate("/leaderboard")} className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-2 hover:shadow-card transition">
+            <Trophy className="w-6 h-6 text-yellow-500" />
+            <span className="text-sm font-semibold text-foreground">{t("lb.title")}</span>
+            <span className="text-xs text-muted-foreground">{t("lb.subtitle")}</span>
           </button>
         </div>
       </div>
