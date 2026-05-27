@@ -1,10 +1,18 @@
 import { useEffect, useState } from "react";
-import { MapPin, ExternalLink, Loader2, School } from "lucide-react";
+import { MapPin, ExternalLink, Loader2, School, Star } from "lucide-react";
 
-type GeoResult = {
-  lat: string;
-  lon: string;
-  display_name: string;
+type SchoolInfo = {
+  found: boolean;
+  name: string;
+  address?: string;
+  lat?: number;
+  lng?: number;
+  placeId?: string;
+  photoUrl?: string | null;
+  embedUrl: string;
+  rating?: number | null;
+  totalRatings?: number | null;
+  mapsUrl?: string;
 };
 
 type SchoolMapProps = {
@@ -12,124 +20,113 @@ type SchoolMapProps = {
 };
 
 const SchoolMap = ({ schoolName }: SchoolMapProps) => {
-  const [geo, setGeo] = useState<GeoResult | null>(null);
+  const [info, setInfo] = useState<SchoolInfo | null>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(false);
+  const [imgError, setImgError] = useState(false);
 
   useEffect(() => {
     if (!schoolName || schoolName.trim().length < 3) return;
-
     let cancelled = false;
     setLoading(true);
-    setError(false);
-    setGeo(null);
+    setInfo(null);
+    setImgError(false);
 
-    const query = encodeURIComponent(`${schoolName} school India`);
-    fetch(
-      `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&addressdetails=1`,
-      { headers: { "Accept-Language": "en", "User-Agent": "EduPath/1.0" } }
-    )
+    fetch(`/api/school-info?name=${encodeURIComponent(schoolName)}`)
       .then((r) => r.json())
-      .then((data: GeoResult[]) => {
-        if (cancelled) return;
-        if (data && data.length > 0) {
-          setGeo(data[0]);
-        } else {
-          setError(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError(true);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      .then((data: SchoolInfo) => { if (!cancelled) setInfo(data); })
+      .catch(() => { if (!cancelled) setInfo(null); })
+      .finally(() => { if (!cancelled) setLoading(false); });
 
     return () => { cancelled = true; };
   }, [schoolName]);
 
   if (!schoolName || schoolName.trim().length < 3) return null;
 
-  const lat = geo ? parseFloat(geo.lat) : null;
-  const lon = geo ? parseFloat(geo.lon) : null;
-  const zoom = 16;
-
-  const mapUrl = lat && lon
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=${lon - 0.005},${lat - 0.005},${lon + 0.005},${lat + 0.005}&layer=mapnik&marker=${lat},${lon}`
-    : null;
-
-  const openMapUrl = lat && lon
-    ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=${zoom}/${lat}/${lon}`
-    : `https://www.openstreetmap.org/search?query=${encodeURIComponent(schoolName + " India")}`;
-
   return (
     <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-card">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
             <School className="w-4 h-4 text-primary" />
           </div>
-          <div>
-            <p className="text-sm font-semibold text-foreground">{schoolName}</p>
-            {geo && (
-              <p className="text-xs text-muted-foreground line-clamp-1 max-w-[220px]">
-                {formatAddress(geo.display_name)}
-              </p>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-foreground truncate">{info?.name ?? schoolName}</p>
+            {info?.address && (
+              <p className="text-xs text-muted-foreground line-clamp-1">{info.address}</p>
+            )}
+            {info?.rating && (
+              <div className="flex items-center gap-1 mt-0.5">
+                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                <span className="text-xs text-muted-foreground">{info.rating.toFixed(1)}</span>
+                {info.totalRatings && (
+                  <span className="text-xs text-muted-foreground">({info.totalRatings.toLocaleString()})</span>
+                )}
+              </div>
             )}
           </div>
         </div>
-        <a
-          href={openMapUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0"
-        >
-          <MapPin className="w-3 h-3" />
-          Open
-          <ExternalLink className="w-3 h-3" />
-        </a>
+        {(info?.mapsUrl || info?.embedUrl) && (
+          <a
+            href={info.mapsUrl ?? info.embedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 text-xs text-primary hover:underline flex-shrink-0 ml-2"
+          >
+            <MapPin className="w-3 h-3" />
+            Maps
+            <ExternalLink className="w-3 h-3" />
+          </a>
+        )}
       </div>
 
-      {/* Map Area */}
-      <div className="relative h-48 bg-muted">
+      {/* School Photo */}
+      {info?.photoUrl && !imgError && (
+        <div className="relative h-36 bg-muted overflow-hidden">
+          <img
+            src={info.photoUrl}
+            alt={`Photo of ${info.name}`}
+            className="w-full h-full object-cover"
+            onError={() => setImgError(true)}
+            loading="lazy"
+          />
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent px-3 py-2">
+            <p className="text-white text-xs font-medium">{info.name}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Map */}
+      <div className="relative h-52 bg-muted">
         {loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted">
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
-            <p className="text-xs text-muted-foreground">Finding location…</p>
+            <p className="text-xs text-muted-foreground">Finding your school…</p>
           </div>
         )}
 
-        {error && !loading && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-muted">
+        {!loading && !info && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
             <MapPin className="w-8 h-8 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground text-center px-4">
-              Location not found. Try a more specific school name.
+            <p className="text-xs text-muted-foreground text-center px-6">
+              Could not load map. Check your connection.
             </p>
-            <a href={openMapUrl} target="_blank" rel="noopener noreferrer"
-              className="text-xs text-primary hover:underline">
-              Search on OpenStreetMap →
-            </a>
           </div>
         )}
 
-        {mapUrl && !loading && (
+        {!loading && info?.embedUrl && (
           <iframe
-            title={`Map of ${schoolName}`}
-            src={mapUrl}
+            title={`Map of ${info.name ?? schoolName}`}
+            src={info.embedUrl}
             className="w-full h-full border-0"
             loading="lazy"
             referrerPolicy="no-referrer"
+            allowFullScreen
           />
         )}
       </div>
     </div>
   );
 };
-
-function formatAddress(displayName: string): string {
-  const parts = displayName.split(",").map((p) => p.trim());
-  return parts.slice(0, 3).join(", ");
-}
 
 export default SchoolMap;
