@@ -2,9 +2,8 @@ import { Router, type IRouter } from "express";
 
 const router: IRouter = Router();
 
-// ─── AI Provider Helpers ───────────────────────────────────────────────────
+// ─── AI Provider Helpers ────────────────────────────────────────────────────
 
-// Groq — fastest, highest priority when key is available
 async function tryGroq(prompt: string): Promise<string | null> {
   const key = process.env.GROQ_API_KEY;
   if (!key) return null;
@@ -27,7 +26,6 @@ async function tryGroq(prompt: string): Promise<string | null> {
   }
 }
 
-// OpenAI / OpenRouter — second priority
 async function tryOpenAI(prompt: string): Promise<string | null> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) return null;
@@ -53,7 +51,6 @@ async function tryOpenAI(prompt: string): Promise<string | null> {
   }
 }
 
-// Gemini — fallback
 async function tryGemini(prompt: string): Promise<string | null> {
   const key = process.env.GOOGLE_AI_API_KEY;
   if (!key) return null;
@@ -79,7 +76,6 @@ async function tryGemini(prompt: string): Promise<string | null> {
   }
 }
 
-// Try all providers in priority order: Groq → OpenAI/OpenRouter → Gemini
 async function callAI(prompt: string): Promise<string | null> {
   return (
     (await tryGroq(prompt)) ??
@@ -88,11 +84,11 @@ async function callAI(prompt: string): Promise<string | null> {
   );
 }
 
-// ─── Route ─────────────────────────────────────────────────────────────────
+// ─── Route ──────────────────────────────────────────────────────────────────
 
-// POST /api/thinking — deep AI analysis of a famous person's thinking style
+// POST /api/thinking
 router.post("/thinking", async (req, res) => {
-  const { personName } = req.body as Record<string, unknown>;
+  const { personName, language } = req.body as Record<string, unknown>;
 
   if (!personName || typeof personName !== "string" || personName.trim().length < 2) {
     res.status(400).json({ error: "Please enter a valid person's name." });
@@ -101,7 +97,22 @@ router.post("/thinking", async (req, res) => {
 
   const name = personName.trim().slice(0, 100);
 
-  const prompt = `You are an expert educational analyst and biographer specializing in the cognitive patterns and philosophies of great thinkers. A student has asked: "How did ${name} think?"
+  // Validate language — whitelist known safe values
+  const ALLOWED_LANGUAGES = [
+    "English", "Hindi", "Kannada", "Tamil", "Telugu",
+    "Marathi", "Bengali", "Gujarati", "Punjabi", "Malayalam",
+  ];
+  const lang =
+    typeof language === "string" && ALLOWED_LANGUAGES.includes(language)
+      ? language
+      : "English";
+
+  const langInstruction =
+    lang === "English"
+      ? ""
+      : `\n\nCRITICAL LANGUAGE REQUIREMENT: You MUST write your ENTIRE response in ${lang}. Every word — all section headings, descriptions, bullet points, quotes, and explanations — must be in ${lang}. Do NOT mix in English except for the person's name and any direct quotes (which you may keep in the original language with a ${lang} translation). This is non-negotiable.\n`;
+
+  const prompt = `You are an expert educational analyst and biographer specializing in the cognitive patterns and philosophies of great thinkers. A student has asked: "How did ${name} think?"${langInstruction}
 
 Your task: Generate a deeply researched, student-friendly analysis of ${name}'s thinking patterns, philosophy, and mindset.
 
@@ -135,7 +146,7 @@ How ${name} generated new ideas. Were they incremental thinkers or disruptors? H
 ## 🌟 Famous Quotes & Their Meaning
 3–5 real quotes from ${name} with a 2–3 sentence explanation of what each quote means and how a student can apply it.
 
-Write with warmth, depth, and precision. This is for students who want to model their thinking after the world's greatest minds.`;
+Write with warmth, depth, and precision. This is for students who want to model their thinking after the world's greatest minds.${lang !== "English" ? `\n\nRemember: Write everything in ${lang}.` : ""}`;
 
   const raw = await callAI(prompt);
 
@@ -153,7 +164,7 @@ Write with warmth, depth, and precision. This is for students who want to model 
     return;
   }
 
-  res.json({ personName: name, analysis: raw.trim() });
+  res.json({ personName: name, analysis: raw.trim(), language: lang });
 });
 
 export default router;
