@@ -1,19 +1,21 @@
 import { skills } from "@/data/skills";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { ArrowLeft } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
 const SkillsPage = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-4xl mx-auto px-4 pt-6">
         <button onClick={() => navigate("/home")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition">
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t("skills.back")}
         </button>
-        <h1 className="text-2xl font-display font-bold text-foreground mb-6">🧠 Skill Modules</h1>
+        <h1 className="text-2xl font-display font-bold text-foreground mb-6">{t("skills.title")}</h1>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {skills.map((skill, idx) => {
             const completedCount = skill.lessons.filter((l) => l.completed).length;
@@ -30,7 +32,7 @@ const SkillsPage = () => {
                 <h3 className="text-lg font-display font-bold text-foreground mt-3">{skill.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{skill.description}</p>
                 <div className="mt-3 flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground">{completedCount}/{skill.lessons.length} lessons</span>
+                  <span className="text-xs text-muted-foreground">{completedCount}/{skill.lessons.length} {t("skills.lessons")}</span>
                   <div className="w-20 h-1.5 bg-muted rounded-full overflow-hidden">
                     <div className="h-full bg-primary rounded-full" style={{ width: `${(completedCount / skill.lessons.length) * 100}%` }} />
                   </div>

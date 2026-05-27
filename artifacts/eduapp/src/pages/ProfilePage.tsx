@@ -1,14 +1,16 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Award, BookOpen, School, Target, UserCircle2 } from "lucide-react";
+import { Award, BookOpen, School, Target, UserCircle2, Globe } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUser } from "@/context/UserContext";
+import { useLanguage, Language } from "@/context/LanguageContext";
 import { goals } from "@/data/goals";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user } = useUser();
+  const { t, language, setLanguage, languageNames } = useLanguage();
 
   if (!user) return null;
 
@@ -25,7 +27,7 @@ const ProfilePage = () => {
       <div className="gradient-dark rounded-b-3xl px-4 pb-8 pt-6 text-primary-foreground">
         <div className="mx-auto max-w-3xl">
           <button onClick={() => navigate("/home")} className="mb-5 text-sm opacity-80 transition hover:opacity-100">
-            ← Back to home
+            {t("profile.back")}
           </button>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
@@ -38,9 +40,9 @@ const ProfilePage = () => {
               </div>
             </div>
             <div className="grid grid-cols-3 gap-3 text-center">
-              <StatCard label="Level" value={String(user.level)} />
-              <StatCard label="XP" value={String(user.xp)} />
-              <StatCard label="Streak" value={`${user.streak}d`} />
+              <StatCard label={t("profile.level")} value={String(user.level)} />
+              <StatCard label={t("profile.xp")} value={String(user.xp)} />
+              <StatCard label={t("profile.streak")} value={`${user.streak}d`} />
             </div>
           </div>
         </div>
@@ -48,21 +50,41 @@ const ProfilePage = () => {
 
       <div className="mx-auto max-w-3xl space-y-6 px-4 py-6">
         <section className="grid gap-4 md:grid-cols-2">
-          <InfoCard icon={<School className="h-5 w-5 text-primary" />} label="School / College" value={user.school || "Not added yet"} />
-          <InfoCard icon={<BookOpen className="h-5 w-5 text-primary" />} label="Class / Standard" value={user.classStandard ? `Class ${user.classStandard}` : "Not added yet"} />
-          <InfoCard icon={<UserCircle2 className="h-5 w-5 text-primary" />} label="USN / Seat Number" value={user.usnOrSetsNo || "Not added yet"} />
-          <InfoCard icon={<Target className="h-5 w-5 text-primary" />} label="Selected Goal" value={currentGoal ? `${currentGoal.emoji} ${currentGoal.title}` : "Goal not selected"} />
+          <InfoCard icon={<School className="h-5 w-5 text-primary" />} label={t("profile.school")} value={user.school || t("profile.not_added")} />
+          <InfoCard icon={<BookOpen className="h-5 w-5 text-primary" />} label={t("profile.class")} value={user.classStandard ? `${t("profile.class_prefix")} ${user.classStandard}` : t("profile.not_added")} />
+          <InfoCard icon={<UserCircle2 className="h-5 w-5 text-primary" />} label={t("profile.usn")} value={user.usnOrSetsNo || t("profile.not_added")} />
+          <InfoCard icon={<Target className="h-5 w-5 text-primary" />} label={t("profile.goal")} value={currentGoal ? `${currentGoal.emoji} ${currentGoal.title}` : t("profile.no_goal")} />
         </section>
 
         <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
           <div className="mb-4 flex items-center gap-2">
             <Award className="h-5 w-5 text-accent" />
-            <h2 className="font-display text-xl font-bold text-foreground">Learning Progress</h2>
+            <h2 className="font-display text-xl font-bold text-foreground">{t("profile.progress")}</h2>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
-            <ProgressCard label="Completed tasks" value={String(user.completedTasks.length)} />
-            <ProgressCard label="Completed lessons" value={String(user.completedLessons.length)} />
-            <ProgressCard label="Goal videos ready" value={String(currentGoal?.videos.length ?? 0)} />
+            <ProgressCard label={t("profile.completed_tasks")} value={String(user.completedTasks.length)} />
+            <ProgressCard label={t("profile.completed_lessons")} value={String(user.completedLessons.length)} />
+            <ProgressCard label={t("profile.goal_videos")} value={String(currentGoal?.videos.length ?? 0)} />
+          </div>
+        </section>
+
+        {/* Language Setting */}
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="mb-3 flex items-center gap-2">
+            <Globe className="h-5 w-5 text-primary" />
+            <h2 className="font-display text-lg font-bold text-foreground">{t("profile.language")}</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-3">{t("profile.lang_hint")}</p>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(languageNames).map(([code, name]) => (
+              <button
+                key={code}
+                onClick={() => setLanguage(code as Language)}
+                className={`px-4 py-2 rounded-full text-sm font-medium transition border ${language === code ? "bg-primary text-primary-foreground border-primary" : "bg-muted text-foreground border-border hover:border-primary"}`}
+              >
+                {name}
+              </button>
+            ))}
           </div>
         </section>
       </div>

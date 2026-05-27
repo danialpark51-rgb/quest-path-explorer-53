@@ -1,14 +1,16 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
+import { useLanguage, Language } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
-import { BookOpen, GraduationCap, User, School, Hash } from "lucide-react";
+import { BookOpen, GraduationCap, User, School, Hash, Globe } from "lucide-react";
 
 const classes = ["6", "7", "8", "9", "10"];
 
 const LoginPage = () => {
   const navigate = useNavigate();
   const { setUser } = useUser();
+  const { t, language, setLanguage, languageNames } = useLanguage();
   const [form, setForm] = useState({
     username: "",
     fullName: "",
@@ -45,68 +47,82 @@ const LoginPage = () => {
             <GraduationCap className="w-8 h-8 text-primary-foreground" />
           </div>
           <h1 className="text-3xl font-display font-bold text-foreground">EduPath</h1>
-          <p className="text-muted-foreground mt-1">Your personalized learning journey starts here</p>
+          <p className="text-muted-foreground mt-1">{t("login.tagline")}</p>
+        </div>
+
+        {/* Language picker — visible before login */}
+        <div className="flex items-center justify-center gap-2 mb-4">
+          <Globe className="w-4 h-4 text-muted-foreground" />
+          <select
+            value={language}
+            onChange={(e) => setLanguage(e.target.value as Language)}
+            className="text-sm px-3 py-1.5 rounded-full border border-border bg-card text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 cursor-pointer"
+          >
+            {Object.entries(languageNames).map(([code, name]) => (
+              <option key={code} value={code}>{name}</option>
+            ))}
+          </select>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-card rounded-2xl shadow-elevated p-6 space-y-4">
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" /> Username
+              <User className="w-4 h-4 text-primary" /> {t("login.username")}
             </label>
             <input
               type="text"
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
-              placeholder="Choose a username"
+              placeholder={t("login.username_ph")}
               required
             />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <User className="w-4 h-4 text-primary" /> Full Name
+              <User className="w-4 h-4 text-primary" /> {t("login.fullname")}
             </label>
             <input
               type="text"
               value={form.fullName}
               onChange={(e) => setForm({ ...form, fullName: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
-              placeholder="Your full name"
+              placeholder={t("login.fullname_ph")}
               required
             />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <School className="w-4 h-4 text-primary" /> School / College
+              <School className="w-4 h-4 text-primary" /> {t("login.school")}
             </label>
             <input
               type="text"
               value={form.school}
               onChange={(e) => setForm({ ...form, school: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
-              placeholder="Your school or college"
+              placeholder={t("login.school_ph")}
             />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <Hash className="w-4 h-4 text-primary" /> USN / Seat Number
+              <Hash className="w-4 h-4 text-primary" /> {t("login.usn")}
             </label>
             <input
               type="text"
               value={form.usnOrSetsNo}
               onChange={(e) => setForm({ ...form, usnOrSetsNo: e.target.value })}
               className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
-              placeholder="Your USN or seat number"
+              placeholder={t("login.usn_ph")}
             />
           </div>
 
           <div>
             <label className="text-sm font-medium text-foreground mb-1 flex items-center gap-2">
-              <BookOpen className="w-4 h-4 text-primary" /> Class / Standard
+              <BookOpen className="w-4 h-4 text-primary" /> {t("login.class")}
             </label>
             <select
               value={form.classStandard}
@@ -114,9 +130,9 @@ const LoginPage = () => {
               className="w-full px-4 py-3 rounded-lg bg-muted border border-border text-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 transition"
               required
             >
-              <option value="">Select your class</option>
+              <option value="">{t("login.class_ph")}</option>
               {classes.map((c) => (
-                <option key={c} value={c}>Class {c}</option>
+                <option key={c} value={c}>{t("login.class_opt")} {c}</option>
               ))}
             </select>
           </div>
@@ -125,7 +141,7 @@ const LoginPage = () => {
             type="submit"
             className="w-full py-3 rounded-lg gradient-hero text-primary-foreground font-semibold text-lg shadow-glow hover:opacity-90 transition-opacity"
           >
-            Get Started 🚀
+            {t("login.get_started")}
           </button>
         </form>
       </motion.div>

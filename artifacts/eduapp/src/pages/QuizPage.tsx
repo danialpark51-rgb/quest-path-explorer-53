@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { quizzes } from "@/data/quizzes";
 import { useUser } from "@/context/UserContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Trophy, CheckCircle, XCircle } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
@@ -11,41 +12,44 @@ const levelBg = { Easy: "bg-primary/10", Medium: "bg-accent/10", Hard: "bg-destr
 
 const QuizListPage = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [filter, setFilter] = useState<"All" | "Easy" | "Medium" | "Hard">("All");
-
   const filtered = filter === "All" ? quizzes : quizzes.filter((q) => q.level === filter);
-  const levels: ("All" | "Easy" | "Medium" | "Hard")[] = ["All", "Easy", "Medium", "Hard"];
+
+  const levels = [
+    { key: "All" as const,   label: t("quiz.all") },
+    { key: "Easy" as const,  label: t("quiz.easy") },
+    { key: "Medium" as const,label: t("quiz.medium") },
+    { key: "Hard" as const,  label: t("quiz.hard") },
+  ];
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <button onClick={() => navigate("/home")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition">
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t("skills.back")}
         </button>
-        <h1 className="text-2xl font-display font-bold text-foreground mb-2">🏆 Quizzes</h1>
-        <p className="text-sm text-muted-foreground mb-4">Test your knowledge across subjects and difficulty levels.</p>
+        <h1 className="text-2xl font-display font-bold text-foreground mb-2">{t("quiz.title")}</h1>
+        <p className="text-sm text-muted-foreground mb-4">{t("quiz.subtitle")}</p>
 
-        <div className="flex gap-2 mb-5">
-          {levels.map((l) => (
-            <button key={l} onClick={() => setFilter(l)}
-              className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === l ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-              {l}
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {levels.map(({ key, label }) => (
+            <button key={key} onClick={() => setFilter(key)}
+              className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === key ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+              {label}
             </button>
           ))}
         </div>
 
         <div className="space-y-3">
           {filtered.map((q) => (
-            <div
-              key={q.id}
-              onClick={() => navigate(`/quiz/${q.id}`)}
-              className="bg-card border border-border rounded-xl p-4 flex items-center justify-between cursor-pointer hover:shadow-card transition"
-            >
+            <div key={q.id} onClick={() => navigate(`/quiz/${q.id}`)}
+              className="bg-card border border-border rounded-xl p-4 flex items-center justify-between cursor-pointer hover:shadow-card transition">
               <div>
                 <h3 className="font-semibold text-foreground">{q.topic}</h3>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${levelBg[q.level]} ${levelColors[q.level]}`}>{q.level}</span>
-                  <span className="text-xs text-muted-foreground">{q.questions.length} questions</span>
+                  <span className="text-xs text-muted-foreground">{q.questions.length} {t("quiz.questions")}</span>
                 </div>
               </div>
               <span className="text-muted-foreground">→</span>
@@ -62,6 +66,7 @@ export const QuizPlayPage = () => {
   const { quizId } = useParams();
   const navigate = useNavigate();
   const { addXP } = useUser();
+  const { t } = useLanguage();
   const quiz = quizzes.find((q) => q.id === quizId);
 
   const [currentQ, setCurrentQ] = useState(0);
@@ -70,7 +75,11 @@ export const QuizPlayPage = () => {
   const [finished, setFinished] = useState(false);
   const [answered, setAnswered] = useState(false);
 
-  if (!quiz) return <div className="min-h-screen flex items-center justify-center text-foreground">Quiz not found</div>;
+  if (!quiz) return (
+    <div className="min-h-screen flex items-center justify-center text-foreground">
+      {t("quiz.not_found")}
+    </div>
+  );
 
   const question = quiz.questions[currentQ];
 
@@ -96,15 +105,17 @@ export const QuizPlayPage = () => {
     const pct = Math.round((score / quiz.questions.length) * 100);
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-card rounded-2xl p-8 text-center shadow-elevated max-w-sm w-full">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          className="bg-card rounded-2xl p-8 text-center shadow-elevated max-w-sm w-full">
           <Trophy className="w-16 h-16 text-accent mx-auto mb-4" />
-          <h1 className="text-2xl font-display font-bold text-foreground">Quiz Complete!</h1>
+          <h1 className="text-2xl font-display font-bold text-foreground">{t("quiz.complete")}</h1>
           <p className="text-4xl font-bold text-primary mt-4">{score}/{quiz.questions.length}</p>
-          <p className="text-sm text-muted-foreground mt-1">{pct}% correct</p>
-          <p className="text-muted-foreground mt-2">You earned {score * 10} XP!</p>
-          {pct >= 80 && <p className="text-sm text-primary font-medium mt-2">🌟 Excellent performance!</p>}
-          <button onClick={() => navigate("/quiz")} className="mt-6 px-6 py-3 rounded-lg gradient-hero text-primary-foreground font-semibold hover:opacity-90 transition">
-            Back to Quizzes
+          <p className="text-sm text-muted-foreground mt-1">{pct}{t("quiz.correct")}</p>
+          <p className="text-muted-foreground mt-2">{t("quiz.earned_xp")} {score * 10} XP!</p>
+          {pct >= 80 && <p className="text-sm text-primary font-medium mt-2">{t("quiz.excellent")}</p>}
+          <button onClick={() => navigate("/quiz")}
+            className="mt-6 px-6 py-3 rounded-lg gradient-hero text-primary-foreground font-semibold hover:opacity-90 transition">
+            {t("quiz.back")}
           </button>
         </motion.div>
       </div>
@@ -115,7 +126,7 @@ export const QuizPlayPage = () => {
     <div className="min-h-screen bg-background p-4">
       <div className="max-w-2xl mx-auto pt-4">
         <button onClick={() => navigate("/quiz")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition">
-          <ArrowLeft className="w-4 h-4" /> Quizzes
+          <ArrowLeft className="w-4 h-4" /> {t("quiz.back")}
         </button>
         <div className="flex items-center justify-between mb-2">
           <h2 className="font-display font-bold text-foreground">{quiz.topic}</h2>
@@ -153,7 +164,7 @@ export const QuizPlayPage = () => {
             {answered && (
               <motion.button initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} onClick={handleNext}
                 className="mt-6 w-full py-3 rounded-lg gradient-hero text-primary-foreground font-semibold hover:opacity-90 transition">
-                {currentQ + 1 >= quiz.questions.length ? "See Results" : "Next Question"}
+                {currentQ + 1 >= quiz.questions.length ? t("quiz.results") : t("quiz.next")}
               </motion.button>
             )}
           </motion.div>

@@ -160,8 +160,8 @@ const AIAssistantPage = () => {
             <Bot className="w-5 h-5 text-primary-foreground" />
           </div>
           <div>
-            <h1 className="font-display font-bold text-foreground text-sm">AI Study Assistant</h1>
-            <p className="text-xs text-primary">Online • Ready to help</p>
+            <h1 className="font-display font-bold text-foreground text-sm">{t("ai.title")}</h1>
+            <p className="text-xs text-primary">{t("ai.subtitle")}</p>
           </div>
         </div>
       </div>
@@ -220,7 +220,7 @@ const AIAssistantPage = () => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
-            placeholder={t("ask_anything")}
+            placeholder={t("ai.placeholder")}
             className="flex-1 px-4 py-3 rounded-xl bg-muted border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 text-sm transition"
             disabled={isLoading}
           />

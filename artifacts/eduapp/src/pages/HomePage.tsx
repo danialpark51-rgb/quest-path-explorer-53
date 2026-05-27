@@ -40,23 +40,26 @@ const HomePage = () => {
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-sm opacity-80">{t("welcome_back")}</p>
+              <p className="text-sm opacity-80">{t("home.welcome")}</p>
               <h1 className="text-xl font-display font-bold">{user.fullName} 👋</h1>
             </div>
             <div className="flex items-center gap-2">
               {/* Language Selector */}
-              <select
-                value={language}
-                onChange={(e) => setLanguage(e.target.value as Language)}
-                className="bg-secondary/20 text-primary-foreground text-xs px-2 py-1.5 rounded-full border-none outline-none cursor-pointer"
-              >
-                {Object.entries(languageNames).map(([code, name]) => (
-                  <option key={code} value={code} className="text-foreground bg-background">{name}</option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1 bg-secondary/20 rounded-full px-2 py-1.5">
+                <Globe className="w-3 h-3 text-primary-foreground/70" />
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as Language)}
+                  className="bg-transparent text-primary-foreground text-xs border-none outline-none cursor-pointer"
+                >
+                  {Object.entries(languageNames).map(([code, name]) => (
+                    <option key={code} value={code} className="text-foreground bg-background">{name}</option>
+                  ))}
+                </select>
+              </div>
               <div className="flex items-center gap-1 bg-accent/20 px-3 py-1.5 rounded-full">
                 <Flame className="w-4 h-4 text-accent" />
-                <span className="text-sm font-semibold">{user.streak} {t("days")}</span>
+                <span className="text-sm font-semibold">{user.streak} {t("home.days")}</span>
               </div>
               <button onClick={() => navigate("/profile")} className="p-2 rounded-full bg-secondary/20 hover:bg-secondary/30 transition" aria-label="Open profile">
                 <UserCircle2 className="w-4 h-4" />
@@ -72,14 +75,14 @@ const HomePage = () => {
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <Award className="w-5 h-5 text-accent" />
-                <span className="font-semibold">{t("level")} {user.level}</span>
+                <span className="font-semibold">{t("home.level")} {user.level}</span>
               </div>
               <span className="text-sm opacity-80">{user.xp} XP</span>
             </div>
             <div className="w-full h-2.5 bg-secondary/20 rounded-full overflow-hidden">
               <motion.div className="h-full rounded-full bg-accent" initial={{ width: 0 }} animate={{ width: `${progress}%` }} transition={{ duration: 0.8 }} />
             </div>
-            <p className="text-xs opacity-70 mt-1">{100 - progress} {t("xp_to_next")}</p>
+            <p className="text-xs opacity-70 mt-1">{100 - progress} {t("home.xp_to_next")}</p>
           </div>
         </div>
       </div>
@@ -88,7 +91,7 @@ const HomePage = () => {
         {/* Goal Progress */}
         {currentGoal && (
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4">
-            <SectionHeader icon={<Target className="w-5 h-5" />} title={t("your_goal")} action={t("change")} onAction={() => navigate("/goals")} />
+            <SectionHeader icon={<Target className="w-5 h-5" />} title={t("home.your_goal")} action={t("home.change")} onAction={() => navigate("/goals")} />
             <div onClick={() => navigate(`/goal/${currentGoal.id}`)} className={`bg-card rounded-xl border-2 ${currentGoal.bgClass} p-4 flex items-center gap-3 cursor-pointer hover:shadow-card transition`}>
               <span className="text-3xl">{currentGoal.emoji}</span>
               <div className="flex-1">
@@ -102,7 +105,7 @@ const HomePage = () => {
 
         {/* Videos */}
         {currentGoal && (
-          <Section icon={<Play className="w-5 h-5" />} title={t("recommended_videos")} action={t("see_all")} onAction={() => navigate(`/goal/${currentGoal.id}`)}>
+          <Section icon={<Play className="w-5 h-5" />} title={t("home.rec_videos")} action={t("home.see_all")} onAction={() => navigate(`/goal/${currentGoal.id}`)}>
             <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
               {currentGoal.videos.slice(0, 5).map((v, i) => (
                 <button key={i} type="button" onClick={() => navigate(`/goal/${currentGoal.id}`)} className="flex-shrink-0 w-52 group text-left">
@@ -122,7 +125,7 @@ const HomePage = () => {
         )}
 
         {/* Daily Tasks */}
-        <Section icon={<Flame className="w-5 h-5" />} title={`${t("daily_tasks")} (${completedTaskCount}/${totalTasks})`} action={t("view_all")} onAction={() => navigate("/tasks")}>
+        <Section icon={<Flame className="w-5 h-5" />} title={`${t("home.daily_tasks")} (${completedTaskCount}/${totalTasks})`} action={t("home.view_all")} onAction={() => navigate("/tasks")}>
           <div className="space-y-2">
             {dailyTasks.slice(0, 4).map((task) => {
               const done = user.completedTasks.includes(task.id);
@@ -137,7 +140,7 @@ const HomePage = () => {
                     <p className={`text-sm font-medium ${done ? "line-through text-muted-foreground" : "text-foreground"}`}>{task.title}</p>
                     <p className="text-xs text-muted-foreground">{task.description}</p>
                     {resource.videoTitle && (
-                      <p className="mt-1 text-xs text-primary">Recommended: {resource.videoTitle}</p>
+                      <p className="mt-1 text-xs text-primary">{t("home.recommended")} {resource.videoTitle}</p>
                     )}
                   </div>
                   <div className="flex items-center gap-1">
@@ -151,14 +154,14 @@ const HomePage = () => {
         </Section>
 
         {/* Skills */}
-        <Section icon={<Brain className="w-5 h-5" />} title={t("skill_modules")} action={t("all_skills")} onAction={() => navigate("/skills")}>
+        <Section icon={<Brain className="w-5 h-5" />} title={t("home.skill_modules")} action={t("home.all_skills")} onAction={() => navigate("/skills")}>
           <div className="grid grid-cols-2 gap-3">
             {skills.slice(0, 4).map((skill) => (
               <div key={skill.id} onClick={() => navigate(`/skill/${skill.id}`)}
                 className="bg-card rounded-xl border border-border p-4 cursor-pointer hover:shadow-card transition group">
                 <span className="text-2xl">{skill.icon}</span>
                 <h4 className="font-semibold text-sm text-foreground mt-2">{skill.title}</h4>
-                <p className="text-xs text-muted-foreground mt-1">{skill.lessons.length} {t("lessons")}</p>
+                <p className="text-xs text-muted-foreground mt-1">{skill.lessons.length} {t("home.lessons")}</p>
               </div>
             ))}
           </div>
@@ -170,20 +173,20 @@ const HomePage = () => {
             onClick={() => navigate("/games")}
             className="bg-card rounded-xl border border-border p-4 cursor-pointer hover:shadow-card transition">
             <Gamepad2 className="w-6 h-6 text-accent" />
-            <h4 className="font-semibold text-sm text-foreground mt-2">{t("games")}</h4>
-            <p className="text-xs text-muted-foreground mt-1">15 brain games</p>
+            <h4 className="font-semibold text-sm text-foreground mt-2">{t("home.games")}</h4>
+            <p className="text-xs text-muted-foreground mt-1">{t("home.brain_games")}</p>
           </motion.div>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
             onClick={() => navigate("/observation")}
             className="bg-card rounded-xl border border-border p-4 cursor-pointer hover:shadow-card transition">
             <Eye className="w-6 h-6 text-primary" />
-            <h4 className="font-semibold text-sm text-foreground mt-2">{t("observation")}</h4>
-            <p className="text-xs text-muted-foreground mt-1">20 image challenges</p>
+            <h4 className="font-semibold text-sm text-foreground mt-2">{t("home.observation")}</h4>
+            <p className="text-xs text-muted-foreground mt-1">{t("home.img_challenges")}</p>
           </motion.div>
         </div>
 
         {/* Audio Stories */}
-        <Section icon={<Headphones className="w-5 h-5" />} title={t("audio_stories")} action={t("all_stories")} onAction={() => navigate("/stories")}>
+        <Section icon={<Headphones className="w-5 h-5" />} title={t("home.audio_stories")} action={t("home.all_stories")} onAction={() => navigate("/stories")}>
           <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-none">
             {audioStories.slice(0, 6).map((story) => (
               <div key={story.id} onClick={() => navigate(`/stories?story=${story.id}`)} className="flex-shrink-0 w-40 bg-card rounded-xl border border-border p-3 cursor-pointer hover:shadow-card transition">
@@ -196,7 +199,7 @@ const HomePage = () => {
         </Section>
 
         {/* News */}
-        <Section icon={<Newspaper className="w-5 h-5" />} title={t("daily_news")} action={t("more")} onAction={() => navigate("/news")}>
+        <Section icon={<Newspaper className="w-5 h-5" />} title={t("home.daily_news")} action={t("home.more")} onAction={() => navigate("/news")}>
           <div className="space-y-2">
             {newsItems.slice(0, 3).map((news) => (
               <div key={news.id} className="bg-card rounded-xl border border-border p-3 flex items-start gap-3">
@@ -215,11 +218,11 @@ const HomePage = () => {
         <div className="grid grid-cols-2 gap-3 mt-4">
           <button onClick={() => navigate("/quiz")} className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-2 hover:shadow-card transition">
             <Trophy className="w-6 h-6 text-accent" />
-            <span className="text-sm font-semibold text-foreground">{t("quizzes")}</span>
+            <span className="text-sm font-semibold text-foreground">{t("home.quizzes")}</span>
           </button>
           <button onClick={() => navigate("/ai-assistant")} className="bg-card rounded-xl border border-border p-4 flex flex-col items-center gap-2 hover:shadow-card transition">
             <MessageCircle className="w-6 h-6 text-primary" />
-            <span className="text-sm font-semibold text-foreground">{t("ai_assistant")}</span>
+            <span className="text-sm font-semibold text-foreground">{t("home.ai_assistant")}</span>
           </button>
         </div>
       </div>

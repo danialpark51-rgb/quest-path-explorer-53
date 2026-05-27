@@ -1,5 +1,6 @@
 import { dailyTasks } from "@/data/dailyTasks";
 import { useUser } from "@/context/UserContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, ExternalLink, Flame, PlayCircle } from "lucide-react";
@@ -9,6 +10,7 @@ import { getDailyTaskResource } from "@/data/videoRecommendations";
 const TasksPage = () => {
   const navigate = useNavigate();
   const { user, completeTask, addXP } = useUser();
+  const { t } = useLanguage();
 
   if (!user) return null;
 
@@ -20,61 +22,42 @@ const TasksPage = () => {
 
   const openTaskResource = (actionType?: string) => {
     switch (actionType) {
-      case "goal-videos":
-        navigate(user.selectedGoal ? `/goal/${user.selectedGoal}` : "/goals");
-        break;
-      case "skills":
-        navigate("/skills");
-        break;
-      case "quiz":
-        navigate("/quiz");
-        break;
-      case "stories":
-        navigate("/stories");
-        break;
-      case "games":
-        navigate("/games");
-        break;
-      case "news":
-        navigate("/news");
-        break;
-      case "observation":
-        navigate("/observation");
-        break;
-      case "ai":
-        navigate("/ai-assistant");
-        break;
-      default:
-        break;
+      case "goal-videos": navigate(user.selectedGoal ? `/goal/${user.selectedGoal}` : "/goals"); break;
+      case "skills": navigate("/skills"); break;
+      case "quiz": navigate("/quiz"); break;
+      case "stories": navigate("/stories"); break;
+      case "games": navigate("/games"); break;
+      case "news": navigate("/news"); break;
+      case "observation": navigate("/observation"); break;
+      case "ai": navigate("/ai-assistant"); break;
+      default: break;
     }
   };
 
-  const openTaskPath = (path?: string) => {
-    if (path) navigate(path);
-  };
-
   const difficulties = ["Easy", "Medium", "Hard"] as const;
+  const diffLabel: Record<string, string> = {
+    Easy: t("tasks.easy"),
+    Medium: t("tasks.medium"),
+    Hard: t("tasks.hard"),
+  };
   const diffColors = { Easy: "text-primary", Medium: "text-accent", Hard: "text-destructive" };
-  const diffEmoji = { Easy: "🟢", Medium: "🟡", Hard: "🔴" };
 
   return (
     <div className="min-h-screen bg-background pb-24">
       <div className="max-w-2xl mx-auto px-4 pt-6">
         <button onClick={() => navigate("/home")} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition">
-          <ArrowLeft className="w-4 h-4" /> Home
+          <ArrowLeft className="w-4 h-4" /> {t("tasks.back")}
         </button>
         <h1 className="text-2xl font-display font-bold text-foreground mb-2 flex items-center gap-2">
-          <Flame className="w-6 h-6 text-accent" /> Daily Tasks
+          <Flame className="w-6 h-6 text-accent" /> {t("tasks.title")}
         </h1>
-        <p className="text-sm text-muted-foreground mb-6">Complete tasks to earn XP and level up!</p>
+        <p className="text-sm text-muted-foreground mb-6">{t("tasks.subtitle")}</p>
 
         {difficulties.map((diff) => {
           const tasks = dailyTasks.filter((t) => t.difficulty === diff);
           return (
             <div key={diff} className="mb-6">
-              <h2 className={`font-display font-bold mb-3 ${diffColors[diff]}`}>
-                {diffEmoji[diff]} {diff}
-              </h2>
+              <h2 className={`font-display font-bold mb-3 ${diffColors[diff]}`}>{diffLabel[diff]}</h2>
               <div className="space-y-2">
                 {tasks.map((task, idx) => {
                   const done = user.completedTasks.includes(task.id);
@@ -101,32 +84,23 @@ const TasksPage = () => {
                           <div className="mt-2 flex flex-wrap gap-2">
                             <button
                               onClick={() => {
-                                if (resource.path) {
-                                  openTaskPath(resource.path);
-                                  return;
-                                }
+                                if (resource.path) { navigate(resource.path); return; }
                                 openTaskResource(task.actionType);
                               }}
                               className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-secondary-foreground transition hover:opacity-90"
                             >
-                              {task.actionLabel ?? "Open"}
+                              {task.actionLabel ?? t("tasks.open")}
                             </button>
                             {resource.videoUrl && (
-                              <a
-                                href={resource.videoUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition hover:opacity-90"
-                              >
-                                <PlayCircle className="h-3.5 w-3.5" /> Watch video
+                              <a href={resource.videoUrl} target="_blank" rel="noopener noreferrer"
+                                className="inline-flex items-center gap-2 rounded-full bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition hover:opacity-90">
+                                <PlayCircle className="h-3.5 w-3.5" /> {t("tasks.watch")}
                               </a>
                             )}
                             {resource.path && task.actionType !== "goal-videos" && (
-                              <button
-                                onClick={() => openTaskPath(resource.path)}
-                                className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted"
-                              >
-                                <ExternalLink className="h-3.5 w-3.5" /> Open lesson
+                              <button onClick={() => navigate(resource.path!)}
+                                className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs font-medium text-foreground transition hover:bg-muted">
+                                <ExternalLink className="h-3.5 w-3.5" /> {t("tasks.open_lesson")}
                               </button>
                             )}
                           </div>

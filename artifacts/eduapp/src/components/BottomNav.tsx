@@ -1,18 +1,20 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { Home, BookOpen, Trophy, Medal, MessageCircle, UserCircle2 } from "lucide-react";
-
-const tabs = [
-  { path: "/home", icon: Home, label: "Home" },
-  { path: "/skills", icon: BookOpen, label: "Skills" },
-  { path: "/quiz", icon: Trophy, label: "Quiz" },
-  { path: "/leaderboard", icon: Medal, label: "Ranks" },
-  { path: "/ai-assistant", icon: MessageCircle, label: "AI" },
-  { path: "/profile", icon: UserCircle2, label: "Profile" },
-];
+import { useLanguage } from "@/context/LanguageContext";
 
 const BottomNav = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { t } = useLanguage();
+
+  const tabs = [
+    { path: "/home",         icon: Home,         label: t("nav.home") },
+    { path: "/skills",       icon: BookOpen,     label: t("nav.skills") },
+    { path: "/quiz",         icon: Trophy,       label: t("nav.quiz") },
+    { path: "/leaderboard",  icon: Medal,        label: t("nav.ranks") },
+    { path: "/ai-assistant", icon: MessageCircle,label: t("nav.ai") },
+    { path: "/profile",      icon: UserCircle2,  label: t("nav.profile") },
+  ];
 
   return (
     <div className="fixed bottom-0 left-0 right-0 bg-card border-t border-border z-50">

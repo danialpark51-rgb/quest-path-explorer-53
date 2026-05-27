@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { newsItems as staticNews, type NewsItem } from "@/data/news";
 import { useNavigate } from "react-router-dom";
+import { useLanguage } from "@/context/LanguageContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight, X, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import BottomNav from "@/components/BottomNav";

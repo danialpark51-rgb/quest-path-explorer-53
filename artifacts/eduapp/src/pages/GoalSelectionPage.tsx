@@ -1,5 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useUser } from "@/context/UserContext";
+import { useLanguage } from "@/context/LanguageContext";
 import { goals } from "@/data/goals";
 import { motion } from "framer-motion";
 import { ArrowRight, Star, Briefcase, TrendingUp } from "lucide-react";
@@ -7,6 +8,7 @@ import { ArrowRight, Star, Briefcase, TrendingUp } from "lucide-react";
 const GoalSelectionPage = () => {
   const navigate = useNavigate();
   const { user, setUser } = useUser();
+  const { t } = useLanguage();
 
   const selectGoal = (goalId: string) => {
     if (!user) return;
@@ -17,15 +19,11 @@ const GoalSelectionPage = () => {
   return (
     <div className="min-h-screen bg-background p-4 pb-8">
       <div className="max-w-4xl mx-auto">
-        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="text-center py-8">
-          <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">Choose Your Goal 🎯</h1>
-          <p className="text-muted-foreground mt-2 max-w-lg mx-auto">
-            Select the career path that excites you. You can always change it later!
-          </p>
+          <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground">{t("goal.choose")}</h1>
+          <p className="text-muted-foreground mt-2 max-w-lg mx-auto">{t("goal.subtitle")}</p>
         </motion.div>
 
-        {/* Goal Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {goals.map((goal, idx) => (
             <motion.div
@@ -58,11 +56,11 @@ const GoalSelectionPage = () => {
               <div className="flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1"><Star className="w-3 h-3" /> {goal.difficulty}</span>
                 <span className="flex items-center gap-1"><TrendingUp className="w-3 h-3" /> {goal.salaryRange}</span>
-                <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {goal.careers.length} careers</span>
+                <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" /> {goal.careers.length} {t("goal.careers")}</span>
               </div>
 
               <div className="mt-3 text-xs text-muted-foreground">
-                🌟 Role model: {goal.roleModel}
+                {t("goal.role_model")} {goal.roleModel}
               </div>
             </motion.div>
           ))}
