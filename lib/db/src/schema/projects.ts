@@ -12,6 +12,9 @@ export const projectsTable = pgTable("projects", {
   goal:           text("goal").notNull().default(""),
   classStandard:  text("class_standard").notNull().default(""),
   school:         text("school").notNull().default(""),
+  // Location fields — nullable so existing projects are not broken
+  city:           text("city"),
+  state:          text("state"),
   likes:          integer("likes").notNull().default(0),
   createdAt:      timestamp("created_at").notNull().defaultNow(),
 });

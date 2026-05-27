@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BookOpen, Trophy, Medal, MessageCircle, UserCircle2 } from "lucide-react";
+import { Home, BookOpen, Trophy, Medal, Brain, UserCircle2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 
 const BottomNav = () => {
@@ -8,12 +8,12 @@ const BottomNav = () => {
   const { t } = useLanguage();
 
   const tabs = [
-    { path: "/home",         icon: Home,         label: t("nav.home") },
-    { path: "/skills",       icon: BookOpen,     label: t("nav.skills") },
-    { path: "/quiz",         icon: Trophy,       label: t("nav.quiz") },
-    { path: "/leaderboard",  icon: Medal,        label: t("nav.ranks") },
-    { path: "/ai-assistant", icon: MessageCircle,label: t("nav.ai") },
-    { path: "/profile",      icon: UserCircle2,  label: t("nav.profile") },
+    { path: "/home",      icon: Home,        label: t("nav.home") },
+    { path: "/skills",    icon: BookOpen,    label: t("nav.skills") },
+    { path: "/quiz",      icon: Trophy,      label: t("nav.quiz") },
+    { path: "/leaderboard", icon: Medal,     label: t("nav.ranks") },
+    { path: "/thinking",  icon: Brain,       label: "Thinking" },
+    { path: "/profile",   icon: UserCircle2, label: t("nav.profile") },
   ];
 
   return (

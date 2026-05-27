@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, Lightbulb, Plus, Heart, User, Clock,
   BookOpen, Search, SlidersHorizontal, MessageSquare,
-  Send, X, ChevronDown, ChevronUp, Zap,
+  Send, X, ChevronDown, ChevronUp, Zap, MapPin, Navigation,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -20,6 +20,9 @@ type Project = {
   goal: string;
   classStandard: string;
   school: string;
+  // Location fields — optional (null for older projects)
+  city: string | null;
+  state: string | null;
   likes: number;
   createdAt: string;
 };
@@ -75,18 +78,25 @@ const ProjectsPage = () => {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   // Pre-fill from Problem Finder
-  const [form, setForm] = useState<{ title: string; description: string; subject: string }>(() => {
+  const [form, setForm] = useState<{
+    title: string;
+    description: string;
+    subject: string;
+    city: string;
+    state: string;
+  }>(() => {
     if (searchParams.get("prefill")) {
       try {
         const saved = sessionStorage.getItem("eduapp-prefill-project");
         if (saved) {
           sessionStorage.removeItem("eduapp-prefill-project");
-          return { ...JSON.parse(saved) };
+          return { ...JSON.parse(saved), city: "", state: "" };
         }
       } catch { /* ignore */ }
     }
-    return { title: "", description: "", subject: SUBJECTS[1] };
+    return { title: "", description: "", subject: SUBJECTS[1], city: "", state: "" };
   });
+  const [gpsLoading, setGpsLoading] = useState(false);
 
   useEffect(() => {
     if (searchParams.get("prefill")) setShowForm(true);
@@ -103,6 +113,32 @@ const ProjectsPage = () => {
 
   useEffect(() => { fetchProjects(); }, [fetchProjects]);
 
+  // GPS auto-fill: reverse-geocode coordinates to city/state using a free API
+  const handleGPSPick = () => {
+    if (!navigator.geolocation) return;
+    setGpsLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${coords.latitude}&lon=${coords.longitude}&format=json`
+          );
+          const d = await r.json() as { address?: { city?: string; town?: string; village?: string; state?: string; country?: string } };
+          const addr = d.address ?? {};
+          const city  = addr.city ?? addr.town ?? addr.village ?? "";
+          const state = addr.state ?? addr.country ?? "";
+          setForm((f) => ({ ...f, city, state }));
+        } catch {
+          // Silently fail — user can fill manually
+        } finally {
+          setGpsLoading(false);
+        }
+      },
+      () => setGpsLoading(false),
+      { timeout: 8000 }
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !form.title.trim() || !form.description.trim()) return;
@@ -112,17 +148,20 @@ const ProjectsPage = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: user.username,
-          fullName: user.fullName,
-          title: form.title.trim(),
-          description: form.description.trim(),
-          subject: form.subject,
-          goal: user.selectedGoal,
+          username:      user.username,
+          fullName:      user.fullName,
+          title:         form.title.trim(),
+          description:   form.description.trim(),
+          subject:       form.subject,
+          goal:          user.selectedGoal,
           classStandard: user.classStandard,
-          school: user.school,
+          school:        user.school,
+          // Location — send only if filled; backend sanitizes and stores null if empty
+          city:          form.city.trim() || undefined,
+          state:         form.state.trim() || undefined,
         }),
       });
-      setForm({ title: "", description: "", subject: SUBJECTS[1] });
+      setForm({ title: "", description: "", subject: SUBJECTS[1], city: "", state: "" });
       setShowForm(false);
       fetchProjects();
     } finally {
@@ -224,6 +263,39 @@ const ProjectsPage = () => {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition resize-none" required />
                 <p className="text-xs text-muted-foreground text-right">{form.description.length}/1000</p>
               </div>
+
+              {/* Location fields */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" /> Location <span className="font-normal text-muted-foreground/60">(optional)</span>
+                  </label>
+                  {typeof navigator !== "undefined" && navigator.geolocation && (
+                    <button type="button" onClick={handleGPSPick} disabled={gpsLoading}
+                      className="flex items-center gap-1 text-[10px] text-primary hover:text-primary/80 font-medium transition disabled:opacity-50">
+                      <Navigation className="w-3 h-3" />
+                      {gpsLoading ? "Detecting…" : "Use GPS"}
+                    </button>
+                  )}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    value={form.city}
+                    onChange={(e) => setForm((f) => ({ ...f, city: e.target.value }))}
+                    placeholder="City / Place"
+                    maxLength={100}
+                    className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition"
+                  />
+                  <input
+                    value={form.state}
+                    onChange={(e) => setForm((f) => ({ ...f, state: e.target.value }))}
+                    placeholder="State / Country"
+                    maxLength={100}
+                    className="flex-1 rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary transition"
+                  />
+                </div>
+              </div>
+
               <div className="flex gap-2">
                 <button type="button" onClick={() => setShowForm(false)}
                   className="flex-1 rounded-xl border border-border py-2 text-sm text-muted-foreground hover:bg-muted transition">{t("proj.cancel")}</button>
@@ -481,6 +553,14 @@ const ProjectDetailModal = ({ project, user, likedIds, onLike, onClose, t }: Mod
               <p className="text-xs text-muted-foreground">
                 {project.school || "Student"}{project.classStandard ? ` · Class ${project.classStandard}` : ""}
               </p>
+              {/* Location — shown only if present */}
+              {(project.city || project.state) && (
+                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                  <MapPin className="w-3 h-3 text-primary/60 flex-shrink-0" />
+                  <span className="font-medium text-primary/80">Published from:</span>
+                  {[project.school, project.city, project.state].filter(Boolean).join(", ")}
+                </p>
+              )}
             </div>
             <button onClick={(e) => onLike(project.id, e)} disabled={isLiked}
               className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border transition ${isLiked ? "bg-red-50 border-red-200 text-red-500" : "border-border text-muted-foreground hover:text-red-500"}`}>

@@ -22,12 +22,16 @@ const LoginPage = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.username || !form.fullName || !form.classStandard) return;
+    // Set lastLoginDate to today so streak logic in UserContext starts correctly
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
     setUser({
       ...form,
       selectedGoal: "",
       xp: 0,
       level: 1,
-      streak: 3,
+      streak: 1,
+      lastLoginDate: todayStr,
       completedTasks: [],
       completedLessons: [],
     });

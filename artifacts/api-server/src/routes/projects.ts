@@ -5,6 +5,14 @@ import { eq, desc, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+// Sanitize a location text field — trim, remove control chars, cap length
+function sanitizeLocation(val: unknown): string | null {
+  if (val === undefined || val === null || val === "") return null;
+  const s = String(val).replace(/[\x00-\x1F\x7F]/g, "").trim().slice(0, 100);
+  return s.length > 0 ? s : null;
+}
+
+// GET /api/projects — fetch all projects, newest first
 router.get("/projects", async (_req, res) => {
   try {
     const rows = await db
@@ -18,24 +26,31 @@ router.get("/projects", async (_req, res) => {
   }
 });
 
+// POST /api/projects — create a project (location fields optional)
 router.post("/projects", async (req, res) => {
-  const { username, fullName, title, description, subject, goal, classStandard, school } = req.body as Record<string, unknown>;
+  const { username, fullName, title, description, subject, goal, classStandard, school, city, state } =
+    req.body as Record<string, unknown>;
+
   if (!username || !title || !description || !subject) {
     res.status(400).json({ error: "username, title, description, subject required" });
     return;
   }
+
   try {
     const [created] = await db
       .insert(projectsTable)
       .values({
-        username: String(username),
-        fullName: String(fullName ?? username),
-        title: String(title),
-        description: String(description),
-        subject: String(subject),
-        goal: String(goal ?? ""),
+        username:      String(username),
+        fullName:      String(fullName ?? username),
+        title:         String(title),
+        description:   String(description),
+        subject:       String(subject),
+        goal:          String(goal ?? ""),
         classStandard: String(classStandard ?? ""),
-        school: String(school ?? ""),
+        school:        String(school ?? ""),
+        // Sanitize location — null if empty/missing so old data stays unaffected
+        city:          sanitizeLocation(city),
+        state:         sanitizeLocation(state),
       })
       .returning();
     res.status(201).json(created);
