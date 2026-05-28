@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart, MessageSquare, Send, X, Plus, Trophy,
   Loader2, Film, Sparkles, ArrowLeft, Trash2,
-  TrendingUp, ChevronDown, ChevronUp,
+  TrendingUp, ChevronDown, ChevronUp, RefreshCcw,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
@@ -37,6 +37,9 @@ type ReelCard = {
   contentType: string;
   likes: number;
   views: number;
+  videoUrl: string | null;
+  remixedFrom: string | null;
+  remixedFromUser: string | null;
   createdAt: string;
 };
 
@@ -320,12 +323,13 @@ interface ReelCardItemProps {
   onCommentSubmit: () => void;
   onDelete: () => void;
   onView: () => void;
+  onRemix: () => void;
 }
 
 function ReelCardItem({
   reel, rank, isLiked, isMine, isExpanded, comments,
   commentInput, isDeleting, onLike, onToggleComments,
-  onCommentChange, onCommentSubmit, onDelete, onView,
+  onCommentChange, onCommentSubmit, onDelete, onView, onRemix,
 }: ReelCardItemProps) {
   const { user } = useUser();
   const tpl = REEL_TEMPLATES.find(t => t.id === reel.templateId) ?? REEL_TEMPLATES[0];

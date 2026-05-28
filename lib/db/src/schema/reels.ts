@@ -19,8 +19,12 @@ export const reelsTable = pgTable("reels", {
   contentType:   text("content_type").notNull().default(""),
   likes:         integer("likes").notNull().default(0),
   views:         integer("views").notNull().default(0),
-  isPublic:      boolean("is_public").notNull().default(true),
-  createdAt:     timestamp("created_at").notNull().defaultNow(),
+  isPublic:         boolean("is_public").notNull().default(true),
+  videoUrl:         text("video_url"),                        // Pika-generated video URL
+  pikaJobId:        text("pika_job_id"),                      // Pika async job ID for polling
+  remixedFrom:      text("remixed_from"),                     // reelId of the original reel
+  remixedFromUser:  text("remixed_from_user"),                // username of original creator
+  createdAt:        timestamp("created_at").notNull().defaultNow(),
 });
 
 // ─── Reel Likes Table ─────────────────────────────────────────────────────────

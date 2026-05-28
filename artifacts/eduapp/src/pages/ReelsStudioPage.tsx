@@ -1,20 +1,24 @@
 /**
  * Skill Reels AI Studio — Multi-step wizard
  *
- * Step 0 – Content   : What are you showcasing?
- * Step 1 – Template  : Choose your visual style
- * Step 2 – Music     : Pick a soundtrack
- * Step 3 – Preview   : Animate, record & download
- * Step 4 – Publish   : Post to the EduPath feed
+ * Step 0 – Content  : What are you showcasing?
+ * Step 1 – Template : Choose your visual style
+ * Step 2 – Music    : Pick a soundtrack
+ * Step 3 – Preview  : Canvas preview + record canvas OR generate with Pika AI
+ * Step 4 – Share    : Published! Share everywhere
+ *
+ * Remix mode: visit /reels/studio?remixFrom={reelId}&template={tplId}&remixUsername={user}
+ * to pre-populate the template and show a "Remixing from @user" banner.
  */
 
-import { useState, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Sparkles, Check, Download,
   Share2, Loader2, Music, Palette, Film, Upload,
-  Play, Square, RefreshCw, Trophy,
+  Play, RefreshCw, Trophy, Wand2, RefreshCcw,
+  ExternalLink, Video,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
@@ -35,6 +39,8 @@ type ContentForm = {
   imageUrl: string;
 };
 
+type PikaState = "idle" | "starting" | "polling" | "done" | "failed";
+
 const STEP_LABELS = ["Content", "Template", "Music", "Preview", "Share"];
 const STEP_ICONS  = [Upload, Palette, Music, Film, Share2];
 
@@ -42,41 +48,58 @@ const EMPTY_FORM: ContentForm = {
   title: "", subtitle: "", contentType: "achievement", score: "", imageUrl: "",
 };
 
-// ─── Helper: tiny API wrapper ─────────────────────────────────────────────────
-
 const API = (path: string, opts?: RequestInit) =>
   fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReelsStudioPage() {
-  const navigate  = useNavigate();
-  const { user }  = useUser();
+  const navigate              = useNavigate();
+  const { user }              = useUser();
+  const [searchParams]        = useSearchParams();
 
+  // ── Remix URL params ───────────────────────────────────────────────────────
+  const remixFromId   = searchParams.get("remixFrom")      ?? "";
+  const remixUsername = searchParams.get("remixUsername")  ?? "";
+  const remixTemplate = searchParams.get("template")       ?? "";
+
+  // ── Wizard state ───────────────────────────────────────────────────────────
   const [step,             setStep]             = useState(0);
   const [form,             setForm]             = useState<ContentForm>(EMPTY_FORM);
-  const [selectedTemplate, setSelectedTemplate] = useState<ReelTemplate>(REEL_TEMPLATES[0]);
+  const [selectedTemplate, setSelectedTemplate] = useState<ReelTemplate>(() => {
+    if (remixTemplate) return REEL_TEMPLATES.find(t => t.id === remixTemplate) ?? REEL_TEMPLATES[0];
+    return REEL_TEMPLATES[0];
+  });
   const [selectedMusic,    setSelectedMusic]    = useState<MusicTrack>(MUSIC_TRACKS[0]);
   const [scenes,           setScenes]           = useState<ReelScene[]>(() =>
     buildDefaultScenes("", "", "achievement", "", "", REEL_TEMPLATES[0]),
   );
-  const [generatedBlob,    setGeneratedBlob]    = useState<Blob | null>(null);
-  const [thumbnailData,    setThumbnailData]    = useState("");
-  const [isAiLoading,      setIsAiLoading]      = useState(false);
-  const [isPublishing,     setIsPublishing]     = useState(false);
-  const [publishedId,      setPublishedId]      = useState("");
-  const [error,            setError]            = useState("");
-  const [recProgress,      setRecProgress]      = useState(0);
 
+  // ── Canvas recording ───────────────────────────────────────────────────────
+  const [generatedBlob,  setGeneratedBlob]  = useState<Blob | null>(null);
+  const [thumbnailData,  setThumbnailData]  = useState("");
+  const [recProgress,    setRecProgress]    = useState(0);
   const rendererRef = useRef<ReelRendererHandle>(null);
 
-  // ── Rebuild default scenes whenever form/template changes ────────────────
-  const rebuildScenes = useCallback(
-    (f: ContentForm, tpl: ReelTemplate) => {
-      setScenes(buildDefaultScenes(f.title, f.subtitle, f.contentType, f.score, f.imageUrl, tpl));
-    },
-    [],
-  );
+  // ── Pika AI video generation ───────────────────────────────────────────────
+  const [pikaState,      setPikaState]      = useState<PikaState>("idle");
+  const [pikaJobId,      setPikaJobId]      = useState("");
+  const [pikaProvider,   setPikaProvider]   = useState("");
+  const [pikaVideoUrl,   setPikaVideoUrl]   = useState("");
+  const [pikaProgress,   setPikaProgress]   = useState(0);
+  const [pikaEta,        setPikaEta]        = useState(0); // seconds remaining estimate
+  const pikaPollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pikaStartRef  = useRef<number>(0);
+
+  // ── General UI ─────────────────────────────────────────────────────────────
+  const [isAiLoading,    setIsAiLoading]    = useState(false);
+  const [isPublishing,   setIsPublishing]   = useState(false);
+  const [error,          setError]          = useState("");
+
+  // ── Scenes / template rebuild ──────────────────────────────────────────────
+  const rebuildScenes = useCallback((f: ContentForm, tpl: ReelTemplate) => {
+    setScenes(buildDefaultScenes(f.title, f.subtitle, f.contentType, f.score, f.imageUrl, tpl));
+  }, []);
 
   const handleFormChange = (patch: Partial<ContentForm>) => {
     const next = { ...form, ...patch };
@@ -89,13 +112,61 @@ export default function ReelsStudioPage() {
     rebuildScenes(form, tpl);
   };
 
-  // ── AI Scene Generation ──────────────────────────────────────────────────
+  // ── Pika polling effect ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (pikaState !== "polling" || !pikaJobId) return;
+
+    pikaStartRef.current = Date.now();
+    const MAX_WAIT_MS = 3 * 60 * 1000; // 3 min max
+
+    const poll = async () => {
+      try {
+        const res  = await API(`/reels/pika-status/${pikaJobId}?provider=${pikaProvider}`);
+        const data = await res.json() as { status: string; videoUrl?: string };
+
+        // Update simulated progress (grows to 90% while waiting)
+        const elapsed = Date.now() - pikaStartRef.current;
+        const simPct  = Math.min(90, Math.round((elapsed / 80_000) * 90));
+        setPikaProgress(simPct);
+        setPikaEta(Math.max(0, Math.round((80_000 - elapsed) / 1000)));
+
+        if (data.status === "finished" && data.videoUrl) {
+          setPikaVideoUrl(data.videoUrl);
+          setPikaState("done");
+          setPikaProgress(100);
+          clearInterval(pikaPollerRef.current!);
+          pikaPollerRef.current = null;
+        } else if (data.status === "failed") {
+          setPikaState("failed");
+          clearInterval(pikaPollerRef.current!);
+          pikaPollerRef.current = null;
+          setError("Pika video generation failed. You can still use the canvas recording below.");
+        }
+
+        // Timeout guard
+        if (elapsed > MAX_WAIT_MS) {
+          setPikaState("failed");
+          clearInterval(pikaPollerRef.current!);
+          pikaPollerRef.current = null;
+          setError("Pika generation timed out. Try again or use canvas recording.");
+        }
+      } catch { /* network hiccup — keep polling */ }
+    };
+
+    pikaPollerRef.current = setInterval(poll, 4000);
+    poll(); // immediate first check
+    return () => {
+      if (pikaPollerRef.current) clearInterval(pikaPollerRef.current);
+    };
+  }, [pikaState, pikaJobId, pikaProvider]);
+
+  // ── OpenAI scene generation ────────────────────────────────────────────────
   const generateWithAI = async () => {
     if (!form.title.trim()) { setError("Please enter a title first."); return; }
     setError("");
     setIsAiLoading(true);
     try {
-      const res = await API("/reels/generate", {
+      const res  = await API("/reels/generate", {
         method: "POST",
         body: JSON.stringify({
           title: form.title, subtitle: form.subtitle,
@@ -113,47 +184,82 @@ export default function ReelsStudioPage() {
     }
   };
 
-  // ── Recording ────────────────────────────────────────────────────────────
+  // ── Pika AI video generation ───────────────────────────────────────────────
+  const generateWithPika = async () => {
+    if (scenes.length === 0) { setError("Complete content setup in Step 1 first."); return; }
+    setError("");
+    setPikaState("starting");
+    setPikaProgress(5);
+    setPikaVideoUrl("");
+
+    try {
+      const res  = await API("/reels/pika-generate", {
+        method: "POST",
+        body: JSON.stringify({
+          title:          form.title || "Student Achievement",
+          scenes:         scenes.slice(0, 3),
+          templateName:   selectedTemplate.name,
+          gradientColors: selectedTemplate.gradient,
+        }),
+      });
+      const data = await res.json() as { jobId?: string; provider?: string; error?: string };
+      if (!res.ok || !data.jobId) throw new Error(data.error ?? "Failed to start Pika generation");
+
+      setPikaJobId(data.jobId);
+      setPikaProvider(data.provider ?? "pika-direct");
+      setPikaState("polling");
+      setPikaProgress(12);
+    } catch (e) {
+      setPikaState("failed");
+      setPikaProgress(0);
+      setError((e as Error).message);
+    }
+  };
+
+  // ── Canvas recording callbacks ─────────────────────────────────────────────
   const handleRecordComplete = (blob: Blob, thumb: string) => {
     setGeneratedBlob(blob);
     setThumbnailData(thumb);
   };
 
-  const handleDownload = () => {
-    if (!generatedBlob) return;
-    const url  = URL.createObjectURL(generatedBlob);
-    const a    = document.createElement("a");
+  const handleDownload = (blobOverride?: Blob) => {
+    const src = blobOverride ?? generatedBlob;
+    if (!src) return;
+    const url = URL.createObjectURL(src);
+    const a   = document.createElement("a");
     a.href     = url;
     a.download = `edupath-reel-${Date.now()}.webm`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
-  // ── Publish ───────────────────────────────────────────────────────────────
+  // ── Publish ────────────────────────────────────────────────────────────────
   const handlePublish = async () => {
     if (!user) return;
     setIsPublishing(true);
     setError("");
     try {
       const hashtags = getTrendingHashtags(user.selectedGoal ?? "", form.contentType).join(",");
-      const res = await API("/reels", {
+      const res  = await API("/reels", {
         method: "POST",
         body: JSON.stringify({
-          username:      user.username,
-          fullName:      user.fullName,
-          title:         form.title || "My Reel",
-          templateId:    selectedTemplate.id,
-          scenesJson:    JSON.stringify(scenes),
-          thumbnailData: thumbnailData || rendererRef.current?.getThumbnail() || "",
+          username:        user.username,
+          fullName:        user.fullName,
+          title:           form.title || "My Reel",
+          templateId:      selectedTemplate.id,
+          scenesJson:      JSON.stringify(scenes),
+          thumbnailData:   thumbnailData || rendererRef.current?.getThumbnail() || "",
           hashtags,
-          musicTrack:    selectedMusic.id,
-          goal:          user.selectedGoal ?? "",
-          contentType:   form.contentType,
+          musicTrack:      selectedMusic.id,
+          goal:            user.selectedGoal ?? "",
+          contentType:     form.contentType,
+          videoUrl:        pikaVideoUrl   || null,
+          remixedFrom:     remixFromId    || null,
+          remixedFromUser: remixUsername  || null,
         }),
       });
       const data = await res.json() as { reelId?: string; error?: string };
       if (!res.ok) throw new Error(data.error ?? "Failed to publish");
-      setPublishedId(data.reelId ?? "");
       setStep(4);
     } catch (e) {
       setError((e as Error).message);
@@ -162,12 +268,13 @@ export default function ReelsStudioPage() {
     }
   };
 
-  // ── Step navigation ───────────────────────────────────────────────────────
-  const canProceed = step === 0 ? form.title.trim().length > 0 : true;
+  // ── Step navigation ────────────────────────────────────────────────────────
+  const canProceedStep0 = form.title.trim().length > 0;
+  const canPublish      = generatedBlob !== null || pikaVideoUrl !== "";
 
   const goNext = () => {
-    if (step === 3 && !generatedBlob) {
-      setError("Please record your reel first before publishing.");
+    if (step === 3 && !canPublish) {
+      setError("Record the canvas reel or generate a Pika AI video first.");
       return;
     }
     if (step === 3) { handlePublish(); return; }
@@ -176,16 +283,25 @@ export default function ReelsStudioPage() {
   };
   const goPrev = () => { setError(""); setStep(s => Math.max(s - 1, 0)); };
 
+  const resetAll = () => {
+    setStep(0); setForm(EMPTY_FORM);
+    setGeneratedBlob(null); setThumbnailData("");
+    setPikaState("idle"); setPikaJobId(""); setPikaVideoUrl(""); setPikaProgress(0);
+  };
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
       <div className="sticky top-0 z-40 bg-card border-b border-border px-4 py-3 flex items-center gap-3">
         <button onClick={() => navigate("/reels")} className="p-1.5 rounded-lg hover:bg-muted">
           <ArrowLeft className="w-5 h-5" />
         </button>
         <div className="flex-1">
-          <h1 className="font-bold text-base text-foreground">Skill Reels Studio</h1>
+          <h1 className="font-bold text-base text-foreground">
+            {remixFromId ? "Remix Studio" : "Skill Reels Studio"}
+          </h1>
           <p className="text-xs text-muted-foreground">AI-powered reel creator</p>
         </div>
         <span className="text-xs bg-primary/10 text-primary font-semibold px-2.5 py-1 rounded-full">
@@ -193,17 +309,30 @@ export default function ReelsStudioPage() {
         </span>
       </div>
 
-      {/* Step progress bar */}
+      {/* ── Remix banner ───────────────────────────────────────────────────── */}
+      {remixFromId && (
+        <div className="mx-4 mt-3 px-3 py-2.5 bg-primary/8 border border-primary/20 rounded-xl flex items-center gap-2 text-sm">
+          <RefreshCcw className="w-4 h-4 text-primary shrink-0" />
+          <span className="text-foreground">
+            Remixing from{" "}
+            <span className="font-bold text-primary">@{remixUsername}</span>
+            {" "}— add your own content!
+          </span>
+        </div>
+      )}
+
+      {/* ── Step progress bar ─────────────────────────────────────────────── */}
       <div className="px-4 pt-4 pb-2">
         <div className="flex items-center gap-1.5">
           {STEP_LABELS.map((label, i) => {
             const Icon = STEP_ICONS[i];
-            const active = i === step;
-            const done   = i < step;
+            const active = i === step, done = i < step;
             return (
               <div key={i} className="flex items-center gap-1.5 flex-1 min-w-0">
                 <div className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                  done ? "bg-primary text-white" : active ? "bg-primary/20 text-primary ring-2 ring-primary" : "bg-muted text-muted-foreground"
+                  done ? "bg-primary text-white" :
+                  active ? "bg-primary/20 text-primary ring-2 ring-primary" :
+                  "bg-muted text-muted-foreground"
                 }`}>
                   {done ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
                 </div>
@@ -219,10 +348,11 @@ export default function ReelsStudioPage() {
         </div>
       </div>
 
-      {/* Error */}
+      {/* ── Error banner ──────────────────────────────────────────────────── */}
       {error && (
-        <div className="mx-4 mb-3 px-3 py-2.5 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl">
-          {error}
+        <div className="mx-4 mb-3 px-3 py-2.5 bg-destructive/10 border border-destructive/20 text-destructive text-sm rounded-xl flex items-center gap-2">
+          <span className="flex-1">{error}</span>
+          <button onClick={() => setError("")} className="text-destructive/60 hover:text-destructive text-xs">✕</button>
         </div>
       )}
 
@@ -235,96 +365,67 @@ export default function ReelsStudioPage() {
           transition={{ duration: 0.22 }}
           className="px-4 space-y-4"
         >
+
           {/* ── STEP 0: Content ─────────────────────────────────────────── */}
           {step === 0 && (
             <div className="space-y-4">
-              <SectionCard title="What are you showcasing?" emoji="🎬">
-                {/* Content type selector */}
+              <SCard title="What are you showcasing?" emoji="🎬">
                 <div className="grid grid-cols-3 gap-2">
                   {CONTENT_TYPES.map(ct => (
-                    <button
-                      key={ct.id}
-                      onClick={() => handleFormChange({ contentType: ct.id })}
+                    <button key={ct.id} onClick={() => handleFormChange({ contentType: ct.id })}
                       className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-sm font-medium transition-all ${
                         form.contentType === ct.id
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-border bg-card text-muted-foreground hover:border-primary/40"
-                      }`}
-                    >
+                      }`}>
                       <span className="text-xl">{ct.emoji}</span>
                       <span className="text-xs">{ct.label}</span>
                     </button>
                   ))}
                 </div>
-              </SectionCard>
+              </SCard>
 
-              <SectionCard title="Reel Details" emoji="📝">
+              <SCard title="Reel Details" emoji="📝">
                 <div className="space-y-3">
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Title <span className="text-destructive">*</span>
-                    </label>
-                    <input
-                      value={form.title}
-                      onChange={e => handleFormChange({ title: e.target.value })}
-                      placeholder={CONTENT_TYPES.find(c => c.id === form.contentType)?.placeholder}
-                      maxLength={80}
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">Subtitle</label>
-                    <input
-                      value={form.subtitle}
-                      onChange={e => handleFormChange({ subtitle: e.target.value })}
-                      placeholder="e.g. Class 10, CBSE Board 2025"
-                      maxLength={60}
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                    />
-                  </div>
+                  <InputField
+                    label="Title" required
+                    value={form.title} maxLength={80}
+                    placeholder={CONTENT_TYPES.find(c => c.id === form.contentType)?.placeholder}
+                    onChange={v => handleFormChange({ title: v })}
+                  />
+                  <InputField
+                    label="Subtitle"
+                    value={form.subtitle} maxLength={60}
+                    placeholder="e.g. Class 10, CBSE Board 2025"
+                    onChange={v => handleFormChange({ subtitle: v })}
+                  />
                   {(form.contentType === "quiz" || form.contentType === "achievement") && (
-                    <div>
-                      <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                        {form.contentType === "quiz" ? "Score / Marks" : "Achievement Detail"}
-                      </label>
-                      <input
-                        value={form.score}
-                        onChange={e => handleFormChange({ score: e.target.value })}
-                        placeholder={form.contentType === "quiz" ? "e.g. 98/100" : "e.g. 1st Place"}
-                        maxLength={40}
-                        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                      />
-                    </div>
-                  )}
-                  <div>
-                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
-                      Image URL <span className="text-muted-foreground/60">(optional)</span>
-                    </label>
-                    <input
-                      value={form.imageUrl}
-                      onChange={e => handleFormChange({ imageUrl: e.target.value })}
-                      placeholder="https://… (paste any image URL)"
-                      className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                    <InputField
+                      label={form.contentType === "quiz" ? "Score / Marks" : "Achievement Detail"}
+                      value={form.score} maxLength={40}
+                      placeholder={form.contentType === "quiz" ? "e.g. 98/100" : "e.g. 1st Place"}
+                      onChange={v => handleFormChange({ score: v })}
                     />
-                  </div>
+                  )}
+                  <InputField
+                    label="Image URL (optional)"
+                    value={form.imageUrl}
+                    placeholder="https://… paste any image URL"
+                    onChange={v => handleFormChange({ imageUrl: v })}
+                  />
                 </div>
-              </SectionCard>
+              </SCard>
 
-              {/* AI Generate button */}
-              <button
-                onClick={generateWithAI}
-                disabled={isAiLoading || !form.title.trim()}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold text-sm shadow-lg disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
-              >
-                {isAiLoading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Generating scenes…</>
-                ) : (
-                  <><Sparkles className="w-4 h-4" /> Generate Scenes with AI</>
-                )}
+              {/* AI scene generator */}
+              <button onClick={generateWithAI} disabled={isAiLoading || !form.title.trim()}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold text-sm shadow-lg disabled:opacity-50 active:scale-95 transition-transform">
+                {isAiLoading
+                  ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating scenes…</>
+                  : <><Sparkles className="w-4 h-4" /> Generate Scenes with AI</>}
               </button>
-              {scenes.length > 0 && (
+              {scenes.length > 0 && form.title && (
                 <p className="text-center text-xs text-primary font-medium">
-                  ✅ {scenes.length} scenes ready — choose a template next
+                  ✅ {scenes.length} scenes ready — pick a template next
                 </p>
               )}
             </div>
@@ -336,25 +437,18 @@ export default function ReelsStudioPage() {
               <p className="text-sm text-muted-foreground text-center">Choose your reel's visual style</p>
               <div className="grid grid-cols-2 gap-3">
                 {REEL_TEMPLATES.map(tpl => (
-                  <button
-                    key={tpl.id}
-                    onClick={() => handleTemplateSelect(tpl)}
+                  <button key={tpl.id} onClick={() => handleTemplateSelect(tpl)}
                     className={`relative overflow-hidden rounded-2xl border-2 transition-all ${
                       selectedTemplate.id === tpl.id
                         ? "border-primary ring-2 ring-primary/40 scale-[0.98]"
                         : "border-border hover:border-primary/40"
-                    }`}
-                  >
-                    {/* Gradient preview */}
-                    <div
-                      className="h-28 w-full flex flex-col items-center justify-center gap-1"
-                      style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}
-                    >
+                    }`}>
+                    <div className="h-28 w-full flex flex-col items-center justify-center gap-1"
+                      style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}>
                       <span className="text-3xl">{tpl.emoji}</span>
                       <span className="text-white font-bold text-xs drop-shadow-md">{tpl.name}</span>
                       <span className="text-white/70 text-[10px] px-2 text-center leading-tight">{tpl.description}</span>
                     </div>
-                    {/* Badges */}
                     <div className="bg-card px-2 py-1.5 flex items-center justify-between">
                       <span className="text-xs text-muted-foreground capitalize">{tpl.transition}</span>
                       <span className="text-xs bg-muted px-1.5 py-0.5 rounded-md">{tpl.layout}</span>
@@ -374,19 +468,16 @@ export default function ReelsStudioPage() {
           {step === 2 && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground text-center">
-                Pick a soundtrack for your reel
-                <span className="block text-xs mt-0.5 text-muted-foreground/60">(Placeholder tracks — connect a music API for real audio)</span>
+                Pick a soundtrack
+                <span className="block text-xs mt-0.5 text-muted-foreground/60">Placeholder tracks — connect a music API for real audio</span>
               </p>
               {MUSIC_TRACKS.map(track => (
-                <button
-                  key={track.id}
-                  onClick={() => setSelectedMusic(track)}
+                <button key={track.id} onClick={() => setSelectedMusic(track)}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                     selectedMusic.id === track.id
                       ? "border-primary bg-primary/8"
                       : "border-border bg-card hover:border-primary/40"
-                  }`}
-                >
+                  }`}>
                   <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center text-2xl shrink-0">
                     {track.emoji}
                   </div>
@@ -405,14 +496,14 @@ export default function ReelsStudioPage() {
             </div>
           )}
 
-          {/* ── STEP 3: Preview & Record ─────────────────────────────────── */}
+          {/* ── STEP 3: Preview & Generate ───────────────────────────────── */}
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Preview your reel, record it, then publish
+                Record your reel <strong>or</strong> generate a real video with Pika AI
               </p>
 
-              {/* Canvas preview */}
+              {/* Canvas live preview */}
               <div className="flex justify-center">
                 <ReelRenderer
                   ref={rendererRef}
@@ -420,16 +511,20 @@ export default function ReelsStudioPage() {
                   template={selectedTemplate}
                   onRecordComplete={handleRecordComplete}
                   onProgress={setRecProgress}
-                  displayWidth={260}
+                  displayWidth={250}
                 />
               </div>
 
-              {/* Scene list */}
+              {/* Scene summary */}
               <div className="bg-muted/50 rounded-xl p-3 space-y-2">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Scenes ({scenes.length})</p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Scenes ({scenes.length})
+                </p>
                 {scenes.map((sc, i) => (
                   <div key={sc.id} className="flex items-start gap-2">
-                    <div className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">{i + 1}</div>
+                    <div className="w-5 h-5 rounded-full bg-primary/15 text-primary text-xs font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {i + 1}
+                    </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{sc.text}</p>
                       {sc.subtext && <p className="text-xs text-muted-foreground truncate">{sc.subtext}</p>}
@@ -439,44 +534,142 @@ export default function ReelsStudioPage() {
                 ))}
               </div>
 
-              {/* Action buttons */}
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => rendererRef.current?.startRecording()}
-                  disabled={!!generatedBlob}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-red-500 text-white font-semibold text-sm disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform"
-                >
-                  <Play className="w-4 h-4" /> Record Reel
-                </button>
-                <button
-                  onClick={() => {
-                    setGeneratedBlob(null);
-                    setThumbnailData("");
-                    setRecProgress(0);
-                  }}
-                  className="flex items-center justify-center gap-2 py-3 rounded-xl bg-muted text-foreground font-semibold text-sm active:scale-95 transition-transform"
-                >
-                  <RefreshCw className="w-4 h-4" /> Reset
-                </button>
-              </div>
-
-              {generatedBlob && (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-xl text-green-700 text-sm">
-                    <Check className="w-4 h-4 shrink-0" />
-                    <span className="font-medium">Reel recorded! {(generatedBlob.size / 1024).toFixed(0)} KB</span>
-                  </div>
-                  <button
-                    onClick={handleDownload}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 border-primary text-primary font-semibold text-sm hover:bg-primary/5 active:scale-95 transition-all"
-                  >
-                    <Download className="w-4 h-4" /> Download .webm
+              {/* ── Option A: Canvas recording ──────────────────────────── */}
+              <div className="border border-border rounded-2xl p-3 space-y-3">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                  <Play className="w-3.5 h-3.5" /> Option A — Record Canvas Animation
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <button onClick={() => rendererRef.current?.startRecording()}
+                    disabled={!!generatedBlob}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-transform">
+                    <Play className="w-4 h-4" /> Record
+                  </button>
+                  <button onClick={() => { setGeneratedBlob(null); setThumbnailData(""); setRecProgress(0); }}
+                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm active:scale-95 transition-transform">
+                    <RefreshCw className="w-4 h-4" /> Reset
                   </button>
                 </div>
+                {generatedBlob && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs font-medium">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      Canvas reel ready · {(generatedBlob.size / 1024).toFixed(0)} KB
+                    </div>
+                    <button onClick={() => handleDownload()}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary/5 active:scale-95 transition-all">
+                      <Download className="w-3.5 h-3.5" /> Download .webm
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* ── Option B: Pika AI video generation ─────────────────── */}
+              <div className="rounded-2xl overflow-hidden border border-violet-200">
+                {/* Header */}
+                <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                    <Wand2 className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-bold text-sm text-white">Option B — Pika AI Real Video</p>
+                    <p className="text-xs text-white/75">Generates an actual MP4 using Pika AI</p>
+                  </div>
+                  {pikaState === "done" && (
+                    <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                      <Check className="w-3.5 h-3.5 text-white" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3 space-y-3 bg-violet-50/50">
+                  {/* IDLE */}
+                  {pikaState === "idle" && (
+                    <button onClick={generateWithPika}
+                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
+                      <Wand2 className="w-4 h-4" /> Generate with Pika AI
+                    </button>
+                  )}
+
+                  {/* STARTING */}
+                  {pikaState === "starting" && (
+                    <div className="flex items-center gap-2 text-violet-700 text-sm font-medium py-1">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Connecting to Pika…
+                    </div>
+                  )}
+
+                  {/* POLLING */}
+                  {pikaState === "polling" && (
+                    <div className="space-y-2.5">
+                      <div className="flex items-center justify-between text-xs font-medium text-violet-700">
+                        <span className="flex items-center gap-1.5">
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          Pika is generating your video…
+                        </span>
+                        <span>{pikaEta > 0 ? `~${pikaEta}s` : "Almost done…"}</span>
+                      </div>
+                      <div className="h-2 bg-violet-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-700"
+                          style={{ width: `${pikaProgress}%` }} />
+                      </div>
+                      <p className="text-[11px] text-violet-500 text-center">
+                        Typically takes 30–90 seconds. Canvas option is still available.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* DONE */}
+                  {pikaState === "done" && pikaVideoUrl && (
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-green-700 text-sm font-bold">
+                        <Check className="w-4 h-4" /> Pika video generated! 🎉
+                      </div>
+                      <video
+                        src={pikaVideoUrl}
+                        controls playsInline
+                        className="w-full rounded-xl max-h-56 bg-black object-contain"
+                      />
+                      <div className="flex items-center gap-2">
+                        <a href={pikaVideoUrl} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline">
+                          <ExternalLink className="w-3.5 h-3.5" /> Open full video
+                        </a>
+                        <span className="text-muted-foreground/40">·</span>
+                        <button onClick={() => setPikaState("idle")}
+                          className="text-xs text-muted-foreground hover:text-foreground">
+                          Regenerate
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* FAILED */}
+                  {pikaState === "failed" && (
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-red-600">Generation failed</p>
+                      <button onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
+                        className="flex items-center gap-1 text-xs text-violet-600 font-medium hover:underline">
+                        <RefreshCcw className="w-3.5 h-3.5" /> Try again
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Publish readiness indicator */}
+              {!canPublish && (
+                <p className="text-center text-xs text-muted-foreground">
+                  Complete Option A or B above to unlock "Publish to Feed"
+                </p>
+              )}
+              {canPublish && (
+                <p className="text-center text-xs text-primary font-semibold">
+                  ✅ {pikaVideoUrl ? "Pika AI video" : "Canvas recording"} ready — tap Publish!
+                </p>
               )}
 
               <div className="text-xs text-muted-foreground/60 text-center">
-                {selectedMusic.emoji} Soundtrack: {selectedMusic.name} · {selectedMusic.genre}
+                {selectedMusic.emoji} {selectedMusic.name} · {selectedMusic.genre}
               </div>
             </div>
           )}
@@ -484,17 +677,31 @@ export default function ReelsStudioPage() {
           {/* ── STEP 4: Share ─────────────────────────────────────────────── */}
           {step === 4 && (
             <div className="space-y-5 py-4">
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="flex flex-col items-center gap-3 text-center"
-              >
+              <motion.div initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+                className="flex flex-col items-center gap-3 text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center text-5xl">🎉</div>
-                <h2 className="text-xl font-bold text-foreground">Reel Published!</h2>
-                <p className="text-sm text-muted-foreground">Your reel is live on EduPath. Share it everywhere!</p>
+                <h2 className="text-xl font-bold text-foreground">
+                  {remixFromId ? "Remix Published!" : "Reel Published!"}
+                </h2>
+                <p className="text-sm text-muted-foreground">
+                  {remixFromId
+                    ? `Your remix of @${remixUsername}'s reel is live!`
+                    : "Your reel is live on EduPath. Share it everywhere!"}
+                </p>
               </motion.div>
 
-              {/* Hashtags */}
+              {/* Pika video if generated */}
+              {pikaVideoUrl && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                    <Video className="w-3.5 h-3.5" /> Your Pika AI Video
+                  </p>
+                  <video src={pikaVideoUrl} controls playsInline
+                    className="w-full rounded-2xl max-h-64 bg-black object-contain shadow-lg" />
+                </div>
+              )}
+
+              {/* Trending hashtags */}
               <div className="bg-muted/40 rounded-xl p-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase mb-2">Trending Hashtags</p>
                 <div className="flex flex-wrap gap-1.5">
@@ -507,15 +714,12 @@ export default function ReelsStudioPage() {
               {/* Share links */}
               <div className="space-y-2">
                 {[
-                  { label: "Share to Instagram", emoji: "📸", color: "from-pink-500 to-purple-600", hint: "Download & upload your .webm to Instagram Reels" },
-                  { label: "Share to TikTok",    emoji: "🎵", color: "from-gray-800 to-gray-900",  hint: "Upload the .webm file to TikTok" },
+                  { label: "Share to Instagram", emoji: "📸", color: "from-pink-500 to-purple-600", hint: "Download & upload to Instagram Reels" },
+                  { label: "Share to TikTok",    emoji: "🎵", color: "from-gray-800 to-gray-900",  hint: "Upload the video file to TikTok" },
                   { label: "Share to YouTube",   emoji: "▶️", color: "from-red-500 to-red-600",    hint: "Upload to YouTube Shorts" },
                 ].map(s => (
-                  <button
-                    key={s.label}
-                    onClick={handleDownload}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r ${s.color} text-white font-semibold text-sm active:scale-95 transition-transform`}
-                  >
+                  <button key={s.label} onClick={() => handleDownload()}
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r ${s.color} text-white font-semibold text-sm active:scale-95 transition-transform`}>
                     <span className="text-xl">{s.emoji}</span>
                     <div className="text-left">
                       <div>{s.label}</div>
@@ -527,41 +731,34 @@ export default function ReelsStudioPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={() => navigate("/reels")}
-                  className="py-3 rounded-xl border-2 border-primary text-primary font-semibold text-sm active:scale-95 transition-transform"
-                >
+                <button onClick={() => navigate("/reels")}
+                  className="py-3 rounded-xl border-2 border-primary text-primary font-semibold text-sm active:scale-95 transition-transform">
                   View Feed
                 </button>
-                <button
-                  onClick={() => { setStep(0); setForm(EMPTY_FORM); setGeneratedBlob(null); setThumbnailData(""); setPublishedId(""); }}
-                  className="py-3 rounded-xl bg-primary text-white font-semibold text-sm active:scale-95 transition-transform"
-                >
-                  New Reel
+                <button onClick={resetAll}
+                  className="py-3 rounded-xl bg-primary text-white font-semibold text-sm active:scale-95 transition-transform">
+                  {remixFromId ? "New Remix" : "New Reel"}
                 </button>
               </div>
             </div>
           )}
+
         </motion.div>
       </AnimatePresence>
 
-      {/* Bottom navigation */}
+      {/* ── Bottom nav buttons ─────────────────────────────────────────────── */}
       {step < 4 && (
         <div className="fixed bottom-16 left-0 right-0 px-4 pb-2">
           <div className="max-w-xl mx-auto flex gap-3">
             {step > 0 && (
-              <button
-                onClick={goPrev}
-                className="flex items-center gap-1.5 px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground font-semibold text-sm active:scale-95 transition-transform"
-              >
+              <button onClick={goPrev}
+                className="flex items-center gap-1.5 px-4 py-3 rounded-xl border-2 border-border bg-card text-foreground font-semibold text-sm active:scale-95 transition-transform">
                 <ArrowLeft className="w-4 h-4" /> Back
               </button>
             )}
-            <button
-              onClick={goNext}
-              disabled={!canProceed || isPublishing}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
-            >
+            <button onClick={goNext}
+              disabled={(!canProceedStep0 && step === 0) || isPublishing}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-primary text-white font-semibold text-sm disabled:opacity-50 active:scale-95 transition-transform">
               {isPublishing ? (
                 <><Loader2 className="w-4 h-4 animate-spin" /> Publishing…</>
               ) : step === 3 ? (
@@ -579,14 +776,37 @@ export default function ReelsStudioPage() {
   );
 }
 
-// ─── Section card wrapper ─────────────────────────────────────────────────────
-function SectionCard({ title, emoji, children }: { title: string; emoji: string; children: React.ReactNode }) {
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function SCard({ title, emoji, children }: { title: string; emoji: string; children: React.ReactNode }) {
   return (
     <div className="bg-card rounded-2xl border border-border p-4 space-y-3">
       <h2 className="font-bold text-sm text-foreground flex items-center gap-2">
         <span>{emoji}</span> {title}
       </h2>
       {children}
+    </div>
+  );
+}
+
+function InputField({
+  label, value, onChange, placeholder, maxLength, required,
+}: {
+  label: string; value: string; onChange: (v: string) => void;
+  placeholder?: string; maxLength?: number; required?: boolean;
+}) {
+  return (
+    <div>
+      <label className="text-xs font-medium text-muted-foreground mb-1 block">
+        {label} {required && <span className="text-destructive">*</span>}
+      </label>
+      <input
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        maxLength={maxLength}
+        className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
+      />
     </div>
   );
 }
