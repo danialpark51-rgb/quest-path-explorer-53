@@ -317,19 +317,33 @@ const ProjectsPage = () => {
     }
   }, [searchParams]);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch (with auto-retry on transient errors) ──────────────────────────
 
-  const fetchProjects = useCallback(() => {
+  const fetchProjects = useCallback(async (attempt = 0) => {
     setLoading(true);
-    setFetchError(false);
-    fetch("/api/projects")
-      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
-      .then((d: { projects: Project[] }) => setProjects(d.projects ?? []))
-      .catch(() => { setProjects([]); setFetchError(true); })
-      .finally(() => setLoading(false));
+    if (attempt === 0) setFetchError(false);
+    try {
+      const r = await fetch("/api/projects");
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      const d = await r.json() as { projects: Project[] };
+      setProjects(d.projects ?? []);
+      setFetchError(false);
+    } catch {
+      if (attempt < 3) {
+        // Retry with backoff: 1.2s, 2.4s, 4.8s — handles server cold-start
+        const delay = 1200 * Math.pow(2, attempt);
+        setTimeout(() => void fetchProjects(attempt + 1), delay);
+      } else {
+        setProjects([]);
+        setFetchError(true);
+        setLoading(false);
+      }
+      return;
+    }
+    setLoading(false);
   }, []);
 
-  useEffect(() => { fetchProjects(); }, [fetchProjects]);
+  useEffect(() => { void fetchProjects(); }, [fetchProjects]);
 
   // ── Create ───────────────────────────────────────────────────────────────
 

@@ -26,8 +26,9 @@ router.get("/projects", async (_req, res) => {
       .orderBy(desc(projectsTable.createdAt))
       .limit(100);
     res.json({ projects: rows });
-  } catch {
-    res.status(500).json({ error: "Failed to fetch projects" });
+  } catch (err) {
+    console.error("[projects] GET /projects error:", err);
+    res.status(500).json({ error: "Failed to load projects. Please try again." });
   }
 });
 
@@ -58,86 +59,89 @@ router.post("/projects", async (req, res) => {
       })
       .returning();
     res.status(201).json(created);
-  } catch {
-    res.status(500).json({ error: "Failed to create project" });
+  } catch (err) {
+    console.error("[projects] POST /projects error:", err);
+    res.status(500).json({ error: "Failed to publish project. Please try again." });
   }
 });
 
-// PUT /api/projects/:id — edit own project (title, description, subject, city, state)
+// PUT /api/projects/:id — edit own project
 router.put("/projects/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid project id" }); return; }
 
   const { username, title, description, subject, city, state } =
     req.body as Record<string, unknown>;
 
   if (!username) { res.status(400).json({ error: "username required" }); return; }
 
-  // Verify ownership before updating
-  const [existing] = await db
-    .select({ username: projectsTable.username })
-    .from(projectsTable)
-    .where(eq(projectsTable.id, id))
-    .limit(1);
-
-  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
-  if (existing.username !== String(username)) {
-    res.status(403).json({ error: "You can only edit your own projects" });
-    return;
-  }
-
-  // Build update payload — only update fields that are provided
-  type UpdatePayload = {
-    title?: string; description?: string; subject?: string;
-    city?: string | null; state?: string | null;
-  };
-  const updates: UpdatePayload = {};
-  if (title)       updates.title       = sanitizeText(title, 100) ?? existing.username;
-  if (description) updates.description = sanitizeText(description, 1000) ?? "";
-  if (subject)     updates.subject     = String(subject);
-  // Location: always update if key present (allow clearing to null)
-  if ("city"  in (req.body as object)) updates.city  = sanitizeLocation(city);
-  if ("state" in (req.body as object)) updates.state = sanitizeLocation(state);
-
   try {
+    // Verify ownership
+    const [existing] = await db
+      .select({ username: projectsTable.username })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, id))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+    if (existing.username !== String(username)) {
+      res.status(403).json({ error: "You can only edit your own projects" });
+      return;
+    }
+
+    type UpdatePayload = {
+      title?: string; description?: string; subject?: string;
+      city?: string | null; state?: string | null;
+    };
+    const updates: UpdatePayload = {};
+    if (title)       updates.title       = sanitizeText(title, 100) ?? existing.username;
+    if (description) updates.description = sanitizeText(description, 1000) ?? "";
+    if (subject)     updates.subject     = String(subject);
+    const body = req.body as Record<string, unknown>;
+    if ("city"  in body) updates.city  = sanitizeLocation(city);
+    if ("state" in body) updates.state = sanitizeLocation(state);
+
     const [updated] = await db
       .update(projectsTable)
       .set(updates)
       .where(and(eq(projectsTable.id, id), eq(projectsTable.username, String(username))))
       .returning();
+
     res.json(updated);
-  } catch {
-    res.status(500).json({ error: "Failed to update project" });
+  } catch (err) {
+    console.error("[projects] PUT /projects/:id error:", err);
+    res.status(500).json({ error: "Failed to update project. Please try again." });
   }
 });
 
-// DELETE /api/projects/:id — delete own project (cascades comments)
+// DELETE /api/projects/:id — delete own project
 router.delete("/projects/:id", async (req, res) => {
   const id = Number(req.params.id);
-  if (isNaN(id)) { res.status(400).json({ error: "Invalid id" }); return; }
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid project id" }); return; }
 
   const { username } = req.body as Record<string, unknown>;
   if (!username) { res.status(400).json({ error: "username required" }); return; }
 
-  const [existing] = await db
-    .select({ username: projectsTable.username })
-    .from(projectsTable)
-    .where(eq(projectsTable.id, id))
-    .limit(1);
-
-  if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
-  if (existing.username !== String(username)) {
-    res.status(403).json({ error: "You can only delete your own projects" });
-    return;
-  }
-
   try {
-    // Delete comments first, then the project
+    // Verify ownership
+    const [existing] = await db
+      .select({ username: projectsTable.username })
+      .from(projectsTable)
+      .where(eq(projectsTable.id, id))
+      .limit(1);
+
+    if (!existing) { res.status(404).json({ error: "Project not found" }); return; }
+    if (existing.username !== String(username)) {
+      res.status(403).json({ error: "You can only delete your own projects" });
+      return;
+    }
+
     await db.delete(projectCommentsTable).where(eq(projectCommentsTable.projectId, id));
     await db.delete(projectsTable).where(eq(projectsTable.id, id));
     res.json({ ok: true });
-  } catch {
-    res.status(500).json({ error: "Failed to delete project" });
+  } catch (err) {
+    console.error("[projects] DELETE /projects/:id error:", err);
+    res.status(500).json({ error: "Failed to delete project. Please try again." });
   }
 });
 
