@@ -60,57 +60,34 @@ async function callAI(prompt: string): Promise<string | null> {
   }
 }
 
-// ─── fal.ai Video Generation ──────────────────────────────────────────────────
+// ─── APIMALL Hailuo Video Generation ─────────────────────────────────────────
 //
-// Server-to-server call — no CORS concern, FAL_API_KEY never touches the browser.
+// Uses the APIMALL gateway to call the Hailuo (MiniMax) text-to-video model.
+// API key: APIMALL_AI environment secret (Bearer token format).
+// Base URL: https://api.apimall.ai
 //
-// Queue flow:
-//   POST https://queue.fal.run/{model}                      → { request_id }
-//   GET  https://queue.fal.run/{model}/requests/{id}/status → { status }
-//   GET  https://queue.fal.run/{model}/requests/{id}        → { video: { url } }
+// Async flow (two-step):
+//   POST /v1/video/generations          → { id }            (job submitted)
+//   GET  /v1/video/generations/{id}     → { status, video } (poll for result)
 //
-// Models are tried in order; each has its own supported parameter set.
+// Status values: pending | processing | completed | failed
 
-type FalModelConfig = {
-  model: string;
-  buildBody: (prompt: string) => Record<string, unknown>;
-};
+const APIMALL_BASE = "https://api.apimall.ai";
 
-const FAL_MODEL_CONFIGS: FalModelConfig[] = [
-  {
-    // Kling v1.6 — best quality, native 9:16
-    model: "fal-ai/kling-video/v1.6/standard/text-to-video",
-    buildBody: (prompt) => ({ prompt, duration: 5, aspect_ratio: "9:16" }),
-  },
-  {
-    // Kling v1 — fallback if v1.6 quota exceeded
-    model: "fal-ai/kling-video/v1/standard/text-to-video",
-    buildBody: (prompt) => ({ prompt, duration: 5, aspect_ratio: "9:16" }),
-  },
-  {
-    // Wan — very cheap short video, wide availability
-    model: "fal-ai/wan/v2.1/1.3b/text-to-video",
-    buildBody: (prompt) => ({ prompt }),
-  },
-  {
-    // MiniMax — fast, does NOT support duration/aspect_ratio params
-    model: "fal-ai/minimax-video/text-to-video",
-    buildBody: (prompt) => ({ prompt, prompt_optimizer: true }),
-  },
-  {
-    // AnimateDiff Lightning — very cheap, text-to-video, fast
-    model: "fal-ai/animatediff-v2v/text-to-video",
-    buildBody: (prompt) => ({ prompt }),
-  },
+// Models to try in order. The provider field is passed back to the frontend
+// and echoed when polling, so the same poll endpoint handles all models.
+const HAILUO_MODELS = [
+  "hailuo-v1",      // Hailuo 1 — standard quality, widely available
+  "hailuo-v1-live", // Hailuo Live variant — same price, sometimes higher availability
+  "minimax-video-01", // MiniMax direct name used by some APIMALL routes
 ];
 
-type FalStatusResult = {
+type HailuoStatusResult = {
   status: "pending" | "processing" | "finished" | "failed";
   videoUrl?: string;
-  errorDetail?: string;
 };
 
-/** fetch() with automatic retry (network errors / 5xx) and exponential back-off. */
+/** fetch() with automatic retry on transient errors (network / 429 / 5xx). */
 async function fetchWithRetry(
   url: string,
   opts: RequestInit,
@@ -120,10 +97,9 @@ async function fetchWithRetry(
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const res = await fetch(url, opts);
-      // Retry on 429 (rate-limit) or 5xx server errors only
       if (attempt < maxRetries && (res.status === 429 || res.status >= 500)) {
-        const delay = 1000 * Math.pow(2, attempt); // 1 s, 2 s
-        console.warn(`[fal] HTTP ${res.status}, retrying in ${delay}ms (attempt ${attempt + 1})`);
+        const delay = 1000 * Math.pow(2, attempt);
+        console.warn(`[hailuo] HTTP ${res.status}, retrying in ${delay}ms`);
         await new Promise(r => setTimeout(r, delay));
         continue;
       }
@@ -132,7 +108,7 @@ async function fetchWithRetry(
       lastErr = e as Error;
       if (attempt < maxRetries) {
         const delay = 1000 * Math.pow(2, attempt);
-        console.warn(`[fal] fetch threw "${lastErr.message}", retrying in ${delay}ms`);
+        console.warn(`[hailuo] fetch threw "${lastErr.message}", retrying in ${delay}ms`);
         await new Promise(r => setTimeout(r, delay));
       }
     }
@@ -190,165 +166,160 @@ async function downloadAndSaveFalVideo(falUrl: string): Promise<string | null> {
   }
 }
 
-/** Submit a fal.ai video generation job. Returns jobId + provider model on success. */
-async function startFalGeneration(
+/** Submit a Hailuo video generation job via APIMALL. Returns jobId + provider on success. */
+async function startHailuoGeneration(
   prompt: string,
 ): Promise<{ jobId: string; provider: string } | { error: string }> {
-  const apiKey = process.env.FAL_API_KEY;
+  const apiKey = process.env.APIMALL_AI;
   if (!apiKey) {
-    return { error: "FAL_API_KEY not configured — add it to your Replit Secrets." };
+    return { error: "APIMALL_AI secret not configured. Add it in Replit Secrets." };
   }
 
   const errors: string[] = [];
 
-  for (const config of FAL_MODEL_CONFIGS) {
+  for (const model of HAILUO_MODELS) {
     try {
-      console.log(`[fal] trying model: ${config.model}`);
-      const body = config.buildBody(prompt);
+      console.log(`[hailuo] trying model: ${model}`);
 
       const r = await fetchWithRetry(
-        `https://queue.fal.run/${config.model}`,
+        `${APIMALL_BASE}/v1/video/generations`,
         {
           method: "POST",
           headers: {
-            "Authorization": `Key ${apiKey}`,
+            "Authorization": `Bearer ${apiKey}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(body),
-          signal: AbortSignal.timeout(25_000),
-        },
-      );
-
-      const rawText = await r.text();
-
-      if (r.ok) {
-        let d: { request_id?: string };
-        try { d = JSON.parse(rawText); } catch { d = {}; }
-
-        if (d.request_id) {
-          console.log(`[fal] ✓ submitted ${config.model}, request_id:`, d.request_id);
-          return { jobId: d.request_id, provider: config.model };
-        }
-        const msg = `HTTP 200 but no request_id — body: ${rawText.slice(0, 200)}`;
-        console.warn(`[fal] ${config.model}: ${msg}`);
-        errors.push(`${config.model}: ${msg}`);
-      } else {
-        // Parse the body to detect billing / account-locked errors early
-        let parsed: { detail?: string } = {};
-        try { parsed = JSON.parse(rawText); } catch { /* ignore */ }
-
-        const detail403 = (parsed.detail ?? "").toLowerCase();
-        const isBillingError =
-          r.status === 403 &&
-          (detail403.includes("exhausted balance") ||
-            detail403.includes("user is locked") ||
-            detail403.includes("top up"));
-
-        if (isBillingError) {
-          // All remaining models will hit the same account-level 403 — bail early
-          console.error("[fal] account locked due to exhausted balance — stopping model iteration");
-          return {
-            error:
-              "BILLING_ERROR: Your fal.ai account has run out of credits. " +
-              "Please top up your balance at https://fal.ai/dashboard/billing and try again.",
-          };
-        }
-
-        const msg = `HTTP ${r.status} — ${rawText.slice(0, 300)}`;
-        console.warn(`[fal] ${config.model}: ${msg}`);
-        errors.push(`${config.model}: ${msg}`);
-      }
-    } catch (e) {
-      const msg = (e as Error).message;
-      console.warn(`[fal] ${config.model} threw: ${msg}`);
-      errors.push(`${config.model}: ${msg}`);
-    }
-  }
-
-  const detail = errors.join(" | ");
-  console.error("[fal] all models failed:", detail);
-  return {
-    error: `AI video generation failed. All models returned errors. Details: ${detail}`,
-  };
-}
-
-/** Poll a fal.ai job for completion and extract the video URL when done. */
-async function getFalStatus(jobId: string, provider: string): Promise<FalStatusResult> {
-  const apiKey = process.env.FAL_API_KEY;
-  if (!apiKey) return { status: "failed" };
-
-  try {
-    // Step 1 — check queue status
-    const statusRes = await fetch(
-      `https://queue.fal.run/${provider}/requests/${jobId}/status`,
-      {
-        headers: { "Authorization": `Key ${apiKey}` },
-        signal: AbortSignal.timeout(12_000),
-      },
-    );
-
-    if (!statusRes.ok) {
-      console.warn("[fal] status endpoint returned", statusRes.status);
-      return { status: "processing" };
-    }
-
-    const statusData = await statusRes.json() as { status?: string };
-    const falStatus = (statusData.status ?? "").toUpperCase();
-    console.log(`[fal] ${jobId} status:`, falStatus);
-
-    if (falStatus === "COMPLETED") {
-      // Step 2 — fetch the full result to extract the video URL
-      const resultRes = await fetch(
-        `https://queue.fal.run/${provider}/requests/${jobId}`,
-        {
-          headers: { "Authorization": `Key ${apiKey}` },
+          body: JSON.stringify({
+            model,
+            prompt,
+            prompt_optimizer: true,
+          }),
           signal: AbortSignal.timeout(30_000),
         },
       );
 
-      if (resultRes.ok) {
-        const result = await resultRes.json() as {
-          video?: { url?: string };
-          output?: { video?: { url?: string } | Array<{ url?: string }> };
-          videos?: Array<{ url?: string }>;
-        };
+      const rawText = await r.text();
+      console.log(`[hailuo] ${model} → HTTP ${r.status}:`, rawText.slice(0, 300));
 
-        // Normalise across different model output shapes:
-        // Kling:   { video: { url } }
-        // MiniMax: { video: { url } } or { output: { video: { url } } }
-        // Some:    { videos: [{ url }] }
-        let falVideoUrl: string | undefined;
-        const vid = result.output?.video ?? result.video;
-        if (Array.isArray(vid)) {
-          falVideoUrl = vid[0]?.url;
-        } else if (vid && typeof vid === "object") {
-          falVideoUrl = (vid as { url?: string }).url;
+      if (r.ok) {
+        let d: { id?: string; task_id?: string; request_id?: string } = {};
+        try { d = JSON.parse(rawText); } catch { /* ignore */ }
+
+        // APIMALL may return id, task_id, or request_id depending on the route version
+        const jobId = d.id ?? d.task_id ?? d.request_id;
+        if (jobId) {
+          console.log(`[hailuo] ✓ submitted ${model}, jobId: ${jobId}`);
+          return { jobId: String(jobId), provider: model };
         }
-        if (!falVideoUrl && Array.isArray(result.videos)) {
-          falVideoUrl = result.videos[0]?.url;
+        const msg = `HTTP 200 but no job id — body: ${rawText.slice(0, 200)}`;
+        console.warn(`[hailuo] ${model}: ${msg}`);
+        errors.push(`${model}: ${msg}`);
+      } else {
+        // Detect billing / auth errors — all models will fail the same way
+        let parsed: { error?: string | { message?: string }; detail?: string; message?: string } = {};
+        try { parsed = JSON.parse(rawText); } catch { /* ignore */ }
+
+        const errMsg = (
+          (typeof parsed.error === "string" ? parsed.error : parsed.error?.message) ??
+          parsed.detail ??
+          parsed.message ??
+          ""
+        ).toLowerCase();
+
+        const isBillingError =
+          r.status === 403 &&
+          (errMsg.includes("balance") || errMsg.includes("credit") ||
+           errMsg.includes("quota") || errMsg.includes("locked"));
+
+        const isAuthError = r.status === 401 || r.status === 403 && errMsg.includes("invalid");
+
+        if (isBillingError) {
+          console.error("[hailuo] account out of credits — stopping");
+          return {
+            error: "BILLING_ERROR: Your APIMALL account has insufficient credits. " +
+              "Please top up at https://apimall.ai/dashboard and try again.",
+          };
+        }
+        if (isAuthError) {
+          console.error("[hailuo] auth error — check APIMALL_AI key");
+          return {
+            error: "AUTH_ERROR: Invalid APIMALL_AI API key. " +
+              "Please verify the key in your Replit Secrets.",
+          };
         }
 
-        console.log("[fal] finished, remote videoUrl:", falVideoUrl?.slice(0, 100));
-
-        if (falVideoUrl) {
-          // Download to local /uploads/ so the URL never expires
-          const localUrl = await downloadAndSaveFalVideo(falVideoUrl);
-          const finalUrl = localUrl ?? falVideoUrl; // fallback to CDN if download fails
-          return { status: "finished", videoUrl: finalUrl };
-        }
+        const msg = `HTTP ${r.status} — ${rawText.slice(0, 300)}`;
+        console.warn(`[hailuo] ${model}: ${msg}`);
+        errors.push(`${model}: ${msg}`);
       }
-      // Result fetch failed but job is done — return finished without URL
+    } catch (e) {
+      const msg = (e as Error).message;
+      console.warn(`[hailuo] ${model} threw: ${msg}`);
+      errors.push(`${model}: ${msg}`);
+    }
+  }
+
+  const detail = errors.join(" | ");
+  console.error("[hailuo] all models failed:", detail);
+  return { error: `AI video generation failed. Details: ${detail}` };
+}
+
+/** Poll a Hailuo job for completion via APIMALL. */
+async function getHailuoStatus(jobId: string): Promise<HailuoStatusResult> {
+  const apiKey = process.env.APIMALL_AI;
+  if (!apiKey) return { status: "failed" };
+
+  try {
+    const r = await fetch(`${APIMALL_BASE}/v1/video/generations/${jobId}`, {
+      headers: { "Authorization": `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+
+    if (!r.ok) {
+      console.warn(`[hailuo] poll HTTP ${r.status} for job ${jobId}`);
+      return { status: "processing" };
+    }
+
+    const data = await r.json() as {
+      status?: string;
+      state?: string;
+      video?: { url?: string };
+      output?: { url?: string; video_url?: string };
+      file_id?: string;
+      file_url?: string;
+      result?: { url?: string };
+    };
+
+    const rawStatus = (data.status ?? data.state ?? "").toLowerCase();
+    console.log(`[hailuo] job ${jobId} status: ${rawStatus}`);
+
+    if (rawStatus === "completed" || rawStatus === "succeeded" || rawStatus === "success") {
+      // Normalise across APIMALL response shapes
+      const remoteUrl =
+        data.video?.url ??
+        data.output?.url ??
+        data.output?.video_url ??
+        data.file_url ??
+        data.result?.url;
+
+      console.log("[hailuo] finished, remote videoUrl:", remoteUrl?.slice(0, 100));
+
+      if (remoteUrl) {
+        // Download to /uploads/ so the URL persists permanently
+        const localUrl = await downloadAndSaveFalVideo(remoteUrl);
+        return { status: "finished", videoUrl: localUrl ?? remoteUrl };
+      }
       return { status: "finished" };
     }
 
-    if (falStatus === "FAILED" || falStatus === "ERROR") {
+    if (rawStatus === "failed" || rawStatus === "error" || rawStatus === "cancelled") {
       return { status: "failed" };
     }
 
-    // QUEUED / IN_PROGRESS
+    // pending / processing / in_progress / queued
     return { status: "processing" };
   } catch (e) {
-    console.warn("[fal] status poll error:", (e as Error).message);
+    console.warn("[hailuo] poll error:", (e as Error).message);
     return { status: "processing" };
   }
 }
@@ -614,7 +585,8 @@ router.post("/reels/upload-video", async (req, res) => {
 });
 
 // ─── POST /api/reels/pika-generate ───────────────────────────────────────────
-// Submits a fal.ai video generation job (endpoint name kept for frontend compat).
+// Submits a Hailuo (APIMALL) video generation job.
+// Endpoint name kept as-is for frontend compatibility.
 // Returns { jobId, provider } on success for the client to poll.
 
 router.post("/reels/pika-generate", async (req, res) => {
@@ -634,9 +606,9 @@ router.post("/reels/pika-generate", async (req, res) => {
     gradientColors ?? ["#6C3483", "#1A5276"],
   );
 
-  console.log("[fal] generating with prompt:", prompt.slice(0, 120), "…");
+  console.log("[hailuo] generating with prompt:", prompt.slice(0, 120), "…");
 
-  const result = await startFalGeneration(prompt);
+  const result = await startHailuoGeneration(prompt);
 
   if ("error" in result) {
     res.status(503).json({ error: result.error });
@@ -647,13 +619,14 @@ router.post("/reels/pika-generate", async (req, res) => {
 });
 
 // ─── GET /api/reels/pika-status/:jobId ───────────────────────────────────────
-// Polls the fal.ai job status (endpoint name kept for frontend compat).
+// Polls the Hailuo (APIMALL) job status.
+// Endpoint name kept as-is for frontend compatibility.
 // Returns { status: "pending"|"processing"|"finished"|"failed", videoUrl? }
 
 router.get("/reels/pika-status/:jobId", async (req, res) => {
   const { jobId } = req.params;
-  const provider  = String(req.query.provider ?? FAL_MODELS[0]);
-  const result    = await getFalStatus(jobId, provider);
+  // provider param accepted for compatibility but not needed for APIMALL polling
+  const result = await getHailuoStatus(jobId);
   res.json(result);
 });
 
