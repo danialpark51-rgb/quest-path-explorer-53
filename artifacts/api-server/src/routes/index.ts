@@ -8,6 +8,7 @@ import projectsRouter from "./projects";
 import commentsRouter from "./comments";
 import problemFinderRouter from "./problemfinder";
 import thinkingRouter from "./thinking";
+import reelsRouter from "./reels";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(projectsRouter);
 router.use(commentsRouter);
 router.use(problemFinderRouter);
 router.use(thinkingRouter);
+router.use(reelsRouter);
 
 export default router;

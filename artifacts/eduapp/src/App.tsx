@@ -23,6 +23,8 @@ import LeaderboardPage from "./pages/LeaderboardPage";
 import ProjectsPage from "./pages/ProjectsPage";
 import ProblemFinderPage from "./pages/ProblemFinderPage";
 import ThinkingPage from "./pages/ThinkingPage";
+import ReelsFeedPage from "./pages/ReelsFeedPage";
+import ReelsStudioPage from "./pages/ReelsStudioPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -58,6 +60,8 @@ const AppRoutes = () => {
       <Route path="/projects" element={<ProtectedRoute><ProjectsPage /></ProtectedRoute>} />
       <Route path="/problem-finder" element={<ProtectedRoute><ProblemFinderPage /></ProtectedRoute>} />
       <Route path="/thinking" element={<ProtectedRoute><ThinkingPage /></ProtectedRoute>} />
+      <Route path="/reels" element={<ProtectedRoute><ReelsFeedPage /></ProtectedRoute>} />
+      <Route path="/reels/studio" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
