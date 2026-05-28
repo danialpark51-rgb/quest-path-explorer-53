@@ -88,9 +88,19 @@ const FAL_MODEL_CONFIGS: FalModelConfig[] = [
     buildBody: (prompt) => ({ prompt, duration: 5, aspect_ratio: "9:16" }),
   },
   {
+    // Wan — very cheap short video, wide availability
+    model: "fal-ai/wan/v2.1/1.3b/text-to-video",
+    buildBody: (prompt) => ({ prompt }),
+  },
+  {
     // MiniMax — fast, does NOT support duration/aspect_ratio params
     model: "fal-ai/minimax-video/text-to-video",
     buildBody: (prompt) => ({ prompt, prompt_optimizer: true }),
+  },
+  {
+    // AnimateDiff Lightning — very cheap, text-to-video, fast
+    model: "fal-ai/animatediff-v2v/text-to-video",
+    buildBody: (prompt) => ({ prompt }),
   },
 ];
 
@@ -223,6 +233,27 @@ async function startFalGeneration(
         console.warn(`[fal] ${config.model}: ${msg}`);
         errors.push(`${config.model}: ${msg}`);
       } else {
+        // Parse the body to detect billing / account-locked errors early
+        let parsed: { detail?: string } = {};
+        try { parsed = JSON.parse(rawText); } catch { /* ignore */ }
+
+        const detail403 = (parsed.detail ?? "").toLowerCase();
+        const isBillingError =
+          r.status === 403 &&
+          (detail403.includes("exhausted balance") ||
+            detail403.includes("user is locked") ||
+            detail403.includes("top up"));
+
+        if (isBillingError) {
+          // All remaining models will hit the same account-level 403 — bail early
+          console.error("[fal] account locked due to exhausted balance — stopping model iteration");
+          return {
+            error:
+              "BILLING_ERROR: Your fal.ai account has run out of credits. " +
+              "Please top up your balance at https://fal.ai/dashboard/billing and try again.",
+          };
+        }
+
         const msg = `HTTP ${r.status} — ${rawText.slice(0, 300)}`;
         console.warn(`[fal] ${config.model}: ${msg}`);
         errors.push(`${config.model}: ${msg}`);
@@ -237,7 +268,7 @@ async function startFalGeneration(
   const detail = errors.join(" | ");
   console.error("[fal] all models failed:", detail);
   return {
-    error: `AI video generation failed across all models. Check FAL_API_KEY and account credits. Details: ${detail}`,
+    error: `AI video generation failed. All models returned errors. Details: ${detail}`,
   };
 }
 

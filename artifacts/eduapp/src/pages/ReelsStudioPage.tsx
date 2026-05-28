@@ -39,7 +39,7 @@ type ContentForm = {
   imageUrl: string;
 };
 
-type PikaState = "idle" | "starting" | "polling" | "done" | "failed";
+type PikaState = "idle" | "starting" | "polling" | "done" | "failed" | "billing";
 
 const STEP_LABELS = ["Content", "Template", "Music", "Preview", "Share"];
 const STEP_ICONS  = [Upload, Palette, Music, Film, Share2];
@@ -212,9 +212,14 @@ export default function ReelsStudioPage() {
       setPikaState("polling");
       setPikaProgress(12);
     } catch (e) {
-      setPikaState("failed");
+      const msg = (e as Error).message ?? "";
       setPikaProgress(0);
-      setError((e as Error).message);
+      if (msg.startsWith("BILLING_ERROR:")) {
+        setPikaState("billing");
+      } else {
+        setPikaState("failed");
+        setError(msg);
+      }
     }
   };
 
@@ -720,6 +725,37 @@ export default function ReelsStudioPage() {
                       <button onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
                         className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline">
                         <RefreshCcw className="w-3.5 h-3.5" /> Try again
+                      </button>
+                    </div>
+                  )}
+
+                  {/* BILLING ERROR */}
+                  {pikaState === "billing" && (
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                        <span className="text-xl shrink-0">💳</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-bold text-amber-800 mb-0.5">
+                            fal.ai account has no credits
+                          </p>
+                          <p className="text-xs text-amber-700 leading-relaxed">
+                            Your fal.ai account balance is exhausted. Top up to generate AI videos.
+                          </p>
+                        </div>
+                      </div>
+                      <a
+                        href="https://fal.ai/dashboard/billing"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm active:scale-95 transition-all"
+                      >
+                        <ExternalLink className="w-4 h-4" /> Top Up at fal.ai/dashboard/billing
+                      </a>
+                      <button
+                        onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-violet-200 text-violet-600 font-medium text-xs hover:bg-violet-50 transition-colors"
+                      >
+                        <RefreshCcw className="w-3.5 h-3.5" /> Try again after topping up
                       </button>
                     </div>
                   )}
