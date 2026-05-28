@@ -1,0 +1,1 @@
+- [Pika API integration](pika-api.md) — dual-endpoint strategy for video generation; key is stored as PIKA_API_KEY secret.

@@ -296,6 +296,9 @@ export default function ReelsFeedPage() {
               onCommentSubmit={() => postComment(reel.reelId)}
               onDelete={() => deleteReel(reel.reelId)}
               onView={() => markView(reel.reelId)}
+              onRemix={() => navigate(
+                `/reels/studio?remixFrom=${reel.reelId}&template=${reel.templateId}&remixUsername=${encodeURIComponent(reel.username)}`
+              )}
             />
           ))}
         </div>
@@ -406,7 +409,18 @@ function ReelCardItem({
             {reel.goal && (
               <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{reel.goal}</span>
             )}
+            {reel.videoUrl && (
+              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">🎬 Pika AI</span>
+            )}
           </div>
+
+          {/* Remix badge */}
+          {reel.remixedFrom && reel.remixedFromUser && (
+            <div className="flex items-center gap-1 text-xs text-muted-foreground">
+              <RefreshCcw className="w-3 h-3 shrink-0" />
+              <span>Remix of <span className="text-primary font-semibold">@{reel.remixedFromUser}</span></span>
+            </div>
+          )}
 
           {/* Hashtags */}
           {tags.length > 0 && (
@@ -418,6 +432,19 @@ function ReelCardItem({
           )}
         </div>
       </div>
+
+      {/* Pika AI video player */}
+      {reel.videoUrl && (
+        <div className="rounded-xl overflow-hidden bg-black">
+          <video
+            src={reel.videoUrl}
+            controls
+            playsInline
+            preload="metadata"
+            className="w-full max-h-52 object-contain"
+          />
+        </div>
+      )}
 
       {/* Action bar */}
       <div className="flex items-center gap-4 pt-1">
@@ -437,6 +464,13 @@ function ReelCardItem({
           <MessageSquare className="w-4 h-4" />
           <span>{comments.length}</span>
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </button>
+        <button
+          onClick={onRemix}
+          className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+        >
+          <RefreshCcw className="w-4 h-4" />
+          <span className="text-xs">Remix</span>
         </button>
         <span className="ml-auto text-xs text-muted-foreground/60">{reel.views} views</span>
       </div>
