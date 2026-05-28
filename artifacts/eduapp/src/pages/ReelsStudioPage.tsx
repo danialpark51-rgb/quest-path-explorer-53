@@ -4,7 +4,7 @@
  * Step 0 – Content  : What are you showcasing?
  * Step 1 – Template : Choose your visual style
  * Step 2 – Music    : Pick a soundtrack
- * Step 3 – Preview  : Canvas preview + record canvas OR generate with fal.ai AI Video
+ * Step 3 – Preview  : Canvas preview + AI video generation with fal.ai
  * Step 4 – Share    : Published! Share everywhere
  *
  * Remix mode: visit /reels/studio?remixFrom={reelId}&template={tplId}&remixUsername={user}
@@ -15,9 +15,9 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Sparkles, Check, Download,
+  ArrowLeft, ArrowRight, Sparkles, Check,
   Share2, Loader2, Music, Palette, Film, Upload,
-  Play, RefreshCw, Trophy, Wand2, RefreshCcw,
+  Play, Trophy, Wand2, RefreshCcw,
   ExternalLink, Video, ImagePlus, X as XIcon, CloudUpload,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
@@ -51,19 +51,6 @@ const EMPTY_FORM: ContentForm = {
 const API = (path: string, opts?: RequestInit) =>
   fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
 
-/** Convert a Blob to a raw base64 string (no data: prefix). */
-function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      resolve(result.split(",")[1] ?? "");
-    };
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
-
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReelsStudioPage() {
@@ -88,10 +75,6 @@ export default function ReelsStudioPage() {
     buildDefaultScenes("", "", "achievement", "", "", REEL_TEMPLATES[0]),
   );
 
-  // ── Canvas recording ───────────────────────────────────────────────────────
-  const [generatedBlob,  setGeneratedBlob]  = useState<Blob | null>(null);
-  const [thumbnailData,  setThumbnailData]  = useState("");
-  const [recProgress,    setRecProgress]    = useState(0);
   const rendererRef = useRef<ReelRendererHandle>(null);
 
   // ── Pika AI video generation ───────────────────────────────────────────────
@@ -109,10 +92,6 @@ export default function ReelsStudioPage() {
   const [customAudioUrl,  setCustomAudioUrl]  = useState("");   // object URL for playback
   const [customAudioName, setCustomAudioName] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // ── Canvas video upload (so it can play back in the feed) ──────────────────
-  const [canvasVideoUrl,  setCanvasVideoUrl]  = useState("");
-  const [isUploading,     setIsUploading]     = useState(false);
 
   // ── General UI ─────────────────────────────────────────────────────────────
   const [isAiLoading,    setIsAiLoading]    = useState(false);
@@ -163,7 +142,7 @@ export default function ReelsStudioPage() {
           setPikaState("failed");
           clearInterval(pikaPollerRef.current!);
           pikaPollerRef.current = null;
-          setError("AI video generation failed. You can still use the canvas recording below.");
+          setError("AI video generation failed. Please try again — the server will retry all available models.");
         }
 
         // Timeout guard
@@ -171,7 +150,7 @@ export default function ReelsStudioPage() {
           setPikaState("failed");
           clearInterval(pikaPollerRef.current!);
           pikaPollerRef.current = null;
-          setError("AI video generation timed out. Try again or use canvas recording.");
+          setError("AI video generation timed out. Please try again.");
         }
       } catch { /* network hiccup — keep polling */ }
     };
@@ -281,42 +260,6 @@ export default function ReelsStudioPage() {
   };
   const stopCustomAudio = () => { audioRef.current?.pause(); };
 
-  // ── Canvas recording callbacks ─────────────────────────────────────────────
-  const handleRecordComplete = async (blob: Blob, thumb: string) => {
-    setGeneratedBlob(blob);
-    setThumbnailData(thumb);
-    // Auto-upload canvas video so it can play back in the feed
-    setIsUploading(true);
-    setCanvasVideoUrl("");
-    try {
-      const base64 = await blobToBase64(blob);
-      const res = await fetch("/api/reels/upload-video", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ videoData: base64, mimeType: blob.type }),
-      });
-      const data = await res.json() as { videoUrl?: string; error?: string };
-      if (data.videoUrl) {
-        setCanvasVideoUrl(data.videoUrl);
-      }
-    } catch {
-      // Upload failed — canvas download still works, just can't play in feed
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleDownload = (blobOverride?: Blob) => {
-    const src = blobOverride ?? generatedBlob;
-    if (!src) return;
-    const url = URL.createObjectURL(src);
-    const a   = document.createElement("a");
-    a.href     = url;
-    a.download = `edupath-reel-${Date.now()}.webm`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
   // ── Publish ────────────────────────────────────────────────────────────────
   const handlePublish = async () => {
     if (!user) return;
@@ -332,12 +275,12 @@ export default function ReelsStudioPage() {
           title:           form.title || "My Reel",
           templateId:      selectedTemplate.id,
           scenesJson:      JSON.stringify(scenes),
-          thumbnailData:   thumbnailData || rendererRef.current?.getThumbnail() || "",
+          thumbnailData:   rendererRef.current?.getThumbnail() || "",
           hashtags,
           musicTrack:      selectedMusic.id === "custom" ? `custom:${customAudioName}` : selectedMusic.id,
           goal:            user.selectedGoal ?? "",
           contentType:     form.contentType,
-          videoUrl:        pikaVideoUrl || canvasVideoUrl || null,
+          videoUrl:        pikaVideoUrl || null,
           remixedFrom:     remixFromId    || null,
           remixedFromUser: remixUsername  || null,
         }),
@@ -354,11 +297,11 @@ export default function ReelsStudioPage() {
 
   // ── Step navigation ────────────────────────────────────────────────────────
   const canProceedStep0 = form.title.trim().length > 0;
-  const canPublish      = generatedBlob !== null || pikaVideoUrl !== "" || canvasVideoUrl !== "";
+  const canPublish      = pikaVideoUrl !== "";
 
   const goNext = () => {
     if (step === 3 && !canPublish) {
-      setError("Record the canvas reel or generate an AI video first.");
+      setError("Generate an AI video first to unlock Publish to Feed.");
       return;
     }
     if (step === 3) { handlePublish(); return; }
@@ -369,7 +312,6 @@ export default function ReelsStudioPage() {
 
   const resetAll = () => {
     setStep(0); setForm(EMPTY_FORM);
-    setGeneratedBlob(null); setThumbnailData(""); setCanvasVideoUrl("");
     setPikaState("idle"); setPikaJobId(""); setPikaVideoUrl(""); setPikaProgress(0);
     stopCustomAudio();
     if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
@@ -658,7 +600,7 @@ export default function ReelsStudioPage() {
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Record your reel <strong>or</strong> generate a real video with fal.ai
+                Preview your reel, then generate a real AI video with fal.ai
               </p>
 
               {/* Canvas live preview */}
@@ -667,8 +609,6 @@ export default function ReelsStudioPage() {
                   ref={rendererRef}
                   scenes={scenes}
                   template={selectedTemplate}
-                  onRecordComplete={handleRecordComplete}
-                  onProgress={setRecProgress}
                   displayWidth={250}
                 />
               </div>
@@ -692,64 +632,7 @@ export default function ReelsStudioPage() {
                 ))}
               </div>
 
-              {/* ── Option A: Canvas recording ──────────────────────────── */}
-              <div className="border border-border rounded-2xl p-3 space-y-3">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                  <Play className="w-3.5 h-3.5" /> Option A — Record Canvas Animation
-                </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => rendererRef.current?.startRecording()}
-                    disabled={!!generatedBlob || isUploading}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-transform">
-                    <Play className="w-4 h-4" /> Record
-                  </button>
-                  <button onClick={() => { setGeneratedBlob(null); setThumbnailData(""); setRecProgress(0); setCanvasVideoUrl(""); }}
-                    className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm active:scale-95 transition-transform">
-                    <RefreshCw className="w-4 h-4" /> Reset
-                  </button>
-                </div>
-
-                {/* Upload progress */}
-                {isUploading && (
-                  <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs font-medium">
-                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                    Uploading video for feed playback…
-                  </div>
-                )}
-
-                {generatedBlob && !isUploading && (
-                  <div className="space-y-2">
-                    {/* Upload status */}
-                    {canvasVideoUrl ? (
-                      <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs font-medium">
-                        <Check className="w-3.5 h-3.5 shrink-0" />
-                        Canvas reel ready · playable in feed · {(generatedBlob.size / 1024).toFixed(0)} KB
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-medium">
-                        <Check className="w-3.5 h-3.5 shrink-0" />
-                        Canvas reel recorded · {(generatedBlob.size / 1024).toFixed(0)} KB (download only)
-                      </div>
-                    )}
-
-                    {/* In-studio preview player */}
-                    {canvasVideoUrl && (
-                      <video
-                        src={canvasVideoUrl}
-                        controls playsInline
-                        className="w-full rounded-xl max-h-48 bg-black object-contain"
-                      />
-                    )}
-
-                    <button onClick={() => handleDownload()}
-                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary/5 active:scale-95 transition-all">
-                      <Download className="w-3.5 h-3.5" /> Download .webm
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* ── Option B: fal.ai video generation ──────────────────── */}
+              {/* ── AI Video Generation ─────────────────────────────────── */}
               <div className="rounded-2xl overflow-hidden border border-violet-200">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center gap-3">
@@ -757,7 +640,7 @@ export default function ReelsStudioPage() {
                     <Wand2 className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-white">Option B — AI Video Generation</p>
+                    <p className="font-bold text-sm text-white">AI Video Generation</p>
                     <p className="text-xs text-white/75">Generates a real MP4 video with fal.ai</p>
                   </div>
                   {pikaState === "done" && (
@@ -798,7 +681,7 @@ export default function ReelsStudioPage() {
                           style={{ width: `${pikaProgress}%` }} />
                       </div>
                       <p className="text-[11px] text-violet-500 text-center">
-                        Typically takes 30–90 seconds. Canvas option is still available.
+                        Typically takes 30–90 seconds. Please wait…
                       </p>
                     </div>
                   )}
@@ -820,7 +703,7 @@ export default function ReelsStudioPage() {
                           <ExternalLink className="w-3.5 h-3.5" /> Open full video
                         </a>
                         <span className="text-muted-foreground/40">·</span>
-                        <button onClick={() => setPikaState("idle")}
+                        <button onClick={() => { setPikaState("idle"); setPikaVideoUrl(""); setPikaProgress(0); }}
                           className="text-xs text-muted-foreground hover:text-foreground">
                           Regenerate
                         </button>
@@ -830,10 +713,12 @@ export default function ReelsStudioPage() {
 
                   {/* FAILED */}
                   {pikaState === "failed" && (
-                    <div className="flex items-center justify-between">
-                      <p className="text-xs text-red-600">Generation failed</p>
+                    <div className="space-y-2">
+                      <p className="text-xs text-red-600 font-medium">
+                        Generation failed — server tried all available models.
+                      </p>
                       <button onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
-                        className="flex items-center gap-1 text-xs text-violet-600 font-medium hover:underline">
+                        className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline">
                         <RefreshCcw className="w-3.5 h-3.5" /> Try again
                       </button>
                     </div>
@@ -842,19 +727,14 @@ export default function ReelsStudioPage() {
               </div>
 
               {/* Publish readiness indicator */}
-              {!canPublish && !isUploading && (
+              {!canPublish && (
                 <p className="text-center text-xs text-muted-foreground">
-                  Complete Option A or B above to unlock "Publish to Feed"
-                </p>
-              )}
-              {isUploading && (
-                <p className="text-center text-xs text-blue-600 font-medium flex items-center justify-center gap-1.5">
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading canvas video…
+                  Generate an AI video above to unlock "Publish to Feed"
                 </p>
               )}
               {canPublish && (
                 <p className="text-center text-xs text-primary font-semibold">
-                  ✅ {pikaVideoUrl ? "AI video" : "Canvas recording"} ready — tap Publish!
+                  ✅ AI video ready — tap Publish to Feed!
                 </p>
               )}
 
@@ -901,21 +781,23 @@ export default function ReelsStudioPage() {
                 </div>
               </div>
 
-              {/* Share links */}
+              {/* Share links — open the AI video directly */}
               <div className="space-y-2">
                 {[
-                  { label: "Share to Instagram", emoji: "📸", color: "from-pink-500 to-purple-600", hint: "Download & upload to Instagram Reels" },
-                  { label: "Share to TikTok",    emoji: "🎵", color: "from-gray-800 to-gray-900",  hint: "Upload the video file to TikTok" },
-                  { label: "Share to YouTube",   emoji: "▶️", color: "from-red-500 to-red-600",    hint: "Upload to YouTube Shorts" },
+                  { label: "Share to Instagram", emoji: "📸", color: "from-pink-500 to-purple-600", hint: "Open video · save · upload to Instagram Reels" },
+                  { label: "Share to TikTok",    emoji: "🎵", color: "from-gray-800 to-gray-900",  hint: "Open video · save · upload to TikTok" },
+                  { label: "Share to YouTube",   emoji: "▶️", color: "from-red-500 to-red-600",    hint: "Open video · save · upload to YouTube Shorts" },
                 ].map(s => (
-                  <button key={s.label} onClick={() => handleDownload()}
-                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r ${s.color} text-white font-semibold text-sm active:scale-95 transition-transform`}>
+                  <button key={s.label}
+                    onClick={() => pikaVideoUrl && window.open(pikaVideoUrl, "_blank")}
+                    disabled={!pikaVideoUrl}
+                    className={`w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r ${s.color} text-white font-semibold text-sm active:scale-95 transition-transform disabled:opacity-40`}>
                     <span className="text-xl">{s.emoji}</span>
                     <div className="text-left">
                       <div>{s.label}</div>
                       <div className="text-xs opacity-70 font-normal">{s.hint}</div>
                     </div>
-                    <Download className="w-4 h-4 ml-auto opacity-70" />
+                    <ExternalLink className="w-4 h-4 ml-auto opacity-70" />
                   </button>
                 ))}
               </div>

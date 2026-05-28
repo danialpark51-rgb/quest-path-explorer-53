@@ -62,28 +62,73 @@ async function callAI(prompt: string): Promise<string | null> {
 
 // ─── fal.ai Video Generation ──────────────────────────────────────────────────
 //
-// Uses the fal.ai queue API to generate real AI videos.
-// Models tried in order:
-//   1. fal-ai/kling-video/v1/standard/text-to-video  — high quality, 9:16 native
-//   2. fal-ai/minimax-video/text-to-video            — fast fallback
-//
-// API key: FAL_API_KEY environment variable (format: "KEY_ID:KEY_SECRET")
-// Docs:    https://fal.ai/docs/model-endpoints/queue
+// Server-to-server call — no CORS concern, FAL_API_KEY never touches the browser.
 //
 // Queue flow:
-//   POST https://queue.fal.run/{model}                         → { request_id }
-//   GET  https://queue.fal.run/{model}/requests/{id}/status    → { status }
-//   GET  https://queue.fal.run/{model}/requests/{id}           → { output: { video: { url } } }
+//   POST https://queue.fal.run/{model}                      → { request_id }
+//   GET  https://queue.fal.run/{model}/requests/{id}/status → { status }
+//   GET  https://queue.fal.run/{model}/requests/{id}        → { video: { url } }
+//
+// Models are tried in order; each has its own supported parameter set.
 
-const FAL_MODELS = [
-  "fal-ai/kling-video/v1/standard/text-to-video",
-  "fal-ai/minimax-video/text-to-video",
+type FalModelConfig = {
+  model: string;
+  buildBody: (prompt: string) => Record<string, unknown>;
+};
+
+const FAL_MODEL_CONFIGS: FalModelConfig[] = [
+  {
+    // Kling v1.6 — best quality, native 9:16
+    model: "fal-ai/kling-video/v1.6/standard/text-to-video",
+    buildBody: (prompt) => ({ prompt, duration: 5, aspect_ratio: "9:16" }),
+  },
+  {
+    // Kling v1 — fallback if v1.6 quota exceeded
+    model: "fal-ai/kling-video/v1/standard/text-to-video",
+    buildBody: (prompt) => ({ prompt, duration: 5, aspect_ratio: "9:16" }),
+  },
+  {
+    // MiniMax — fast, does NOT support duration/aspect_ratio params
+    model: "fal-ai/minimax-video/text-to-video",
+    buildBody: (prompt) => ({ prompt, prompt_optimizer: true }),
+  },
 ];
 
 type FalStatusResult = {
   status: "pending" | "processing" | "finished" | "failed";
   videoUrl?: string;
+  errorDetail?: string;
 };
+
+/** fetch() with automatic retry (network errors / 5xx) and exponential back-off. */
+async function fetchWithRetry(
+  url: string,
+  opts: RequestInit,
+  maxRetries = 2,
+): Promise<Response> {
+  let lastErr: Error = new Error("unknown");
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const res = await fetch(url, opts);
+      // Retry on 429 (rate-limit) or 5xx server errors only
+      if (attempt < maxRetries && (res.status === 429 || res.status >= 500)) {
+        const delay = 1000 * Math.pow(2, attempt); // 1 s, 2 s
+        console.warn(`[fal] HTTP ${res.status}, retrying in ${delay}ms (attempt ${attempt + 1})`);
+        await new Promise(r => setTimeout(r, delay));
+        continue;
+      }
+      return res;
+    } catch (e) {
+      lastErr = e as Error;
+      if (attempt < maxRetries) {
+        const delay = 1000 * Math.pow(2, attempt);
+        console.warn(`[fal] fetch threw "${lastErr.message}", retrying in ${delay}ms`);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+  }
+  throw lastErr;
+}
 
 /** Build an optimised text-to-video prompt for educational reels. */
 function buildVideoPrompt(
@@ -141,42 +186,59 @@ async function startFalGeneration(
 ): Promise<{ jobId: string; provider: string } | { error: string }> {
   const apiKey = process.env.FAL_API_KEY;
   if (!apiKey) {
-    return { error: "FAL_API_KEY not configured. Add it to your environment secrets." };
+    return { error: "FAL_API_KEY not configured — add it to your Replit Secrets." };
   }
 
-  for (const model of FAL_MODELS) {
+  const errors: string[] = [];
+
+  for (const config of FAL_MODEL_CONFIGS) {
     try {
-      const r = await fetch(`https://queue.fal.run/${model}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Key ${apiKey}`,
-          "Content-Type": "application/json",
+      console.log(`[fal] trying model: ${config.model}`);
+      const body = config.buildBody(prompt);
+
+      const r = await fetchWithRetry(
+        `https://queue.fal.run/${config.model}`,
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Key ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(25_000),
         },
-        body: JSON.stringify({
-          prompt,
-          duration: 5,
-          aspect_ratio: "9:16",
-        }),
-        signal: AbortSignal.timeout(20_000),
-      });
+      );
+
+      const rawText = await r.text();
 
       if (r.ok) {
-        const d = await r.json() as { request_id?: string };
+        let d: { request_id?: string };
+        try { d = JSON.parse(rawText); } catch { d = {}; }
+
         if (d.request_id) {
-          console.log(`[fal] submitted ${model}, request_id:`, d.request_id);
-          return { jobId: d.request_id, provider: model };
+          console.log(`[fal] ✓ submitted ${config.model}, request_id:`, d.request_id);
+          return { jobId: d.request_id, provider: config.model };
         }
-        console.warn(`[fal] ${model} responded OK but no request_id:`, JSON.stringify(d).slice(0, 200));
+        const msg = `HTTP 200 but no request_id — body: ${rawText.slice(0, 200)}`;
+        console.warn(`[fal] ${config.model}: ${msg}`);
+        errors.push(`${config.model}: ${msg}`);
       } else {
-        const errText = await r.text().catch(() => "");
-        console.warn(`[fal] ${model} → ${r.status}:`, errText.slice(0, 300));
+        const msg = `HTTP ${r.status} — ${rawText.slice(0, 300)}`;
+        console.warn(`[fal] ${config.model}: ${msg}`);
+        errors.push(`${config.model}: ${msg}`);
       }
     } catch (e) {
-      console.warn(`[fal] ${model} request threw:`, (e as Error).message);
+      const msg = (e as Error).message;
+      console.warn(`[fal] ${config.model} threw: ${msg}`);
+      errors.push(`${config.model}: ${msg}`);
     }
   }
 
-  return { error: "Could not start AI video generation. Verify FAL_API_KEY and try again." };
+  const detail = errors.join(" | ");
+  console.error("[fal] all models failed:", detail);
+  return {
+    error: `AI video generation failed across all models. Check FAL_API_KEY and account credits. Details: ${detail}`,
+  };
 }
 
 /** Poll a fal.ai job for completion and extract the video URL when done. */
