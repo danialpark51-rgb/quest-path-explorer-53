@@ -20,8 +20,15 @@ router.post("/chat", async (req, res) => {
     return;
   }
 
+  const replitAIKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const replitAIBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GOOGLE_AI_API_KEY;
+
+  if (replitAIKey && replitAIBase) {
+    await handleOpenAI(messages, replitAIKey, replitAIBase, "gpt-4o-mini", res);
+    return;
+  }
 
   if (geminiKey) {
     const ok = await tryGemini(messages, geminiKey, res);

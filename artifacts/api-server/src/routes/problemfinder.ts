@@ -14,6 +14,29 @@ type Problem = {
 };
 
 async function callAI(prompt: string): Promise<string | null> {
+  const replitKey = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const replitBase = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+
+  if (replitKey && replitBase) {
+    try {
+      const res = await fetch(`${replitBase}/chat/completions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${replitKey}` },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [{ role: "user", content: prompt }],
+          max_tokens: 2048,
+          temperature: 0.8,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json() as { choices?: { message?: { content?: string } }[] };
+        const text = data?.choices?.[0]?.message?.content;
+        if (text) return text;
+      }
+    } catch { /* fall through */ }
+  }
+
   const geminiKey = process.env.GOOGLE_AI_API_KEY;
   const openaiKey = process.env.OPENAI_API_KEY;
 

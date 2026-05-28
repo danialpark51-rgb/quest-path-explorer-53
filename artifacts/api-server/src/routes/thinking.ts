@@ -76,8 +76,32 @@ async function tryGemini(prompt: string): Promise<string | null> {
   }
 }
 
+async function tryReplitAI(prompt: string): Promise<string | null> {
+  const key = process.env.AI_INTEGRATIONS_OPENAI_API_KEY;
+  const base = process.env.AI_INTEGRATIONS_OPENAI_BASE_URL;
+  if (!key || !base) return null;
+  try {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 4096,
+        temperature: 0.7,
+      }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { choices?: { message?: { content?: string } }[] };
+    return data?.choices?.[0]?.message?.content ?? null;
+  } catch {
+    return null;
+  }
+}
+
 async function callAI(prompt: string): Promise<string | null> {
   return (
+    (await tryReplitAI(prompt)) ??
     (await tryGroq(prompt)) ??
     (await tryOpenAI(prompt)) ??
     (await tryGemini(prompt))
