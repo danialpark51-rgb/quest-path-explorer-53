@@ -18,7 +18,7 @@ import {
   ArrowLeft, ArrowRight, Sparkles, Check, Download,
   Share2, Loader2, Music, Palette, Film, Upload,
   Play, RefreshCw, Trophy, Wand2, RefreshCcw,
-  ExternalLink, Video,
+  ExternalLink, Video, ImagePlus, X as XIcon, CloudUpload,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
@@ -50,6 +50,19 @@ const EMPTY_FORM: ContentForm = {
 
 const API = (path: string, opts?: RequestInit) =>
   fetch(`/api${path}`, { headers: { "Content-Type": "application/json" }, ...opts });
+
+/** Convert a Blob to a raw base64 string (no data: prefix). */
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1] ?? "");
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
@@ -90,6 +103,16 @@ export default function ReelsStudioPage() {
   const [pikaEta,        setPikaEta]        = useState(0); // seconds remaining estimate
   const pikaPollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pikaStartRef  = useRef<number>(0);
+
+  // ── Custom media (image attachment + audio upload) ─────────────────────────
+  const [customAudioFile, setCustomAudioFile] = useState<File | null>(null);
+  const [customAudioUrl,  setCustomAudioUrl]  = useState("");   // object URL for playback
+  const [customAudioName, setCustomAudioName] = useState("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // ── Canvas video upload (so it can play back in the feed) ──────────────────
+  const [canvasVideoUrl,  setCanvasVideoUrl]  = useState("");
+  const [isUploading,     setIsUploading]     = useState(false);
 
   // ── General UI ─────────────────────────────────────────────────────────────
   const [isAiLoading,    setIsAiLoading]    = useState(false);
@@ -216,10 +239,71 @@ export default function ReelsStudioPage() {
     }
   };
 
+  // ── Image file attachment ──────────────────────────────────────────────────
+  const handleImageFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      handleFormChange({ imageUrl: dataUrl });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  // ── Custom audio upload ────────────────────────────────────────────────────
+  const handleCustomAudio = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
+    const url = URL.createObjectURL(file);
+    setCustomAudioFile(file);
+    setCustomAudioUrl(url);
+    setCustomAudioName(file.name.length > 30 ? file.name.slice(0, 27) + "…" : file.name);
+    const customTrack: MusicTrack = {
+      id: "custom", name: file.name.replace(/\.[^.]+$/, "").slice(0, 40),
+      artist: "Your upload", duration: "–", genre: "Custom", emoji: "🎵",
+    };
+    setSelectedMusic(customTrack);
+    e.target.value = "";
+  };
+
+  // ── Play / stop custom audio preview ──────────────────────────────────────
+  const playCustomAudio = () => {
+    if (!customAudioUrl) return;
+    if (!audioRef.current) {
+      audioRef.current = new Audio(customAudioUrl);
+      audioRef.current.loop = true;
+    }
+    audioRef.current.src = customAudioUrl;
+    audioRef.current.play().catch(() => {});
+  };
+  const stopCustomAudio = () => { audioRef.current?.pause(); };
+
   // ── Canvas recording callbacks ─────────────────────────────────────────────
-  const handleRecordComplete = (blob: Blob, thumb: string) => {
+  const handleRecordComplete = async (blob: Blob, thumb: string) => {
     setGeneratedBlob(blob);
     setThumbnailData(thumb);
+    // Auto-upload canvas video so it can play back in the feed
+    setIsUploading(true);
+    setCanvasVideoUrl("");
+    try {
+      const base64 = await blobToBase64(blob);
+      const res = await fetch("/api/reels/upload-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoData: base64, mimeType: blob.type }),
+      });
+      const data = await res.json() as { videoUrl?: string; error?: string };
+      if (data.videoUrl) {
+        setCanvasVideoUrl(data.videoUrl);
+      }
+    } catch {
+      // Upload failed — canvas download still works, just can't play in feed
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleDownload = (blobOverride?: Blob) => {
@@ -250,10 +334,10 @@ export default function ReelsStudioPage() {
           scenesJson:      JSON.stringify(scenes),
           thumbnailData:   thumbnailData || rendererRef.current?.getThumbnail() || "",
           hashtags,
-          musicTrack:      selectedMusic.id,
+          musicTrack:      selectedMusic.id === "custom" ? `custom:${customAudioName}` : selectedMusic.id,
           goal:            user.selectedGoal ?? "",
           contentType:     form.contentType,
-          videoUrl:        pikaVideoUrl   || null,
+          videoUrl:        pikaVideoUrl || canvasVideoUrl || null,
           remixedFrom:     remixFromId    || null,
           remixedFromUser: remixUsername  || null,
         }),
@@ -270,7 +354,7 @@ export default function ReelsStudioPage() {
 
   // ── Step navigation ────────────────────────────────────────────────────────
   const canProceedStep0 = form.title.trim().length > 0;
-  const canPublish      = generatedBlob !== null || pikaVideoUrl !== "";
+  const canPublish      = generatedBlob !== null || pikaVideoUrl !== "" || canvasVideoUrl !== "";
 
   const goNext = () => {
     if (step === 3 && !canPublish) {
@@ -285,8 +369,11 @@ export default function ReelsStudioPage() {
 
   const resetAll = () => {
     setStep(0); setForm(EMPTY_FORM);
-    setGeneratedBlob(null); setThumbnailData("");
+    setGeneratedBlob(null); setThumbnailData(""); setCanvasVideoUrl("");
     setPikaState("idle"); setPikaJobId(""); setPikaVideoUrl(""); setPikaProgress(0);
+    stopCustomAudio();
+    if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
+    setCustomAudioFile(null); setCustomAudioUrl(""); setCustomAudioName("");
   };
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -407,12 +494,38 @@ export default function ReelsStudioPage() {
                       onChange={v => handleFormChange({ score: v })}
                     />
                   )}
-                  <InputField
-                    label="Image URL (optional)"
-                    value={form.imageUrl}
-                    placeholder="https://… paste any image URL"
-                    onChange={v => handleFormChange({ imageUrl: v })}
-                  />
+                  {/* Image / video attachment from gallery or files */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground mb-1 block">
+                      Photo / Video (optional)
+                    </label>
+                    {form.imageUrl ? (
+                      <div className="relative">
+                        <img
+                          src={form.imageUrl}
+                          alt="preview"
+                          className="w-full max-h-36 object-cover rounded-xl border border-border"
+                        />
+                        <button
+                          onClick={() => handleFormChange({ imageUrl: "" })}
+                          className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80"
+                        >
+                          <XIcon className="w-3.5 h-3.5 text-white" />
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="flex items-center justify-center gap-2 w-full py-3 rounded-xl border-2 border-dashed border-border bg-muted/30 cursor-pointer hover:border-primary/40 hover:bg-primary/5 transition-colors">
+                        <ImagePlus className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">Attach from gallery or files</span>
+                        <input
+                          type="file"
+                          accept="image/*,video/*"
+                          className="hidden"
+                          onChange={handleImageFile}
+                        />
+                      </label>
+                    )}
+                  </div>
                 </div>
               </SCard>
 
@@ -468,11 +581,56 @@ export default function ReelsStudioPage() {
           {step === 2 && (
             <div className="space-y-3">
               <p className="text-sm text-muted-foreground text-center">
-                Pick a soundtrack
-                <span className="block text-xs mt-0.5 text-muted-foreground/60">Placeholder tracks — connect a music API for real audio</span>
+                Pick a soundtrack or upload your own
               </p>
+
+              {/* ── Custom audio upload ─────────────────────────────────── */}
+              <label className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                selectedMusic.id === "custom"
+                  ? "border-primary bg-primary/8"
+                  : "border-dashed border-border bg-muted/30 hover:border-primary/40 hover:bg-primary/5"
+              }`}>
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-green-500/20 to-emerald-400/10 flex items-center justify-center text-2xl shrink-0">
+                  🎵
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-semibold text-sm text-foreground">
+                    {customAudioName || "Upload Your Music"}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {customAudioName ? "Your upload · tap to change" : "MP3, WAV, OGG, M4A — any audio file"}
+                  </div>
+                </div>
+                {customAudioName && selectedMusic.id === "custom" ? (
+                  <div className="flex gap-1.5 shrink-0">
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); playCustomAudio(); }}
+                      className="p-1.5 rounded-lg bg-primary/10 text-primary hover:bg-primary/20">
+                      <Play className="w-3.5 h-3.5" />
+                    </button>
+                    <button type="button"
+                      onClick={e => { e.preventDefault(); e.stopPropagation(); stopCustomAudio(); }}
+                      className="p-1.5 rounded-lg bg-muted text-muted-foreground hover:bg-muted/80">
+                      <XIcon className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <CloudUpload className="w-4 h-4 text-muted-foreground shrink-0" />
+                )}
+                <input type="file" accept="audio/*" className="hidden" onChange={handleCustomAudio} />
+              </label>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 border-t border-border" />
+                <p className="relative text-center text-xs text-muted-foreground bg-background px-2 w-fit mx-auto">
+                  or choose a preset
+                </p>
+              </div>
+
+              {/* ── Preset tracks ───────────────────────────────────────── */}
               {MUSIC_TRACKS.map(track => (
-                <button key={track.id} onClick={() => setSelectedMusic(track)}
+                <button key={track.id} onClick={() => { setSelectedMusic(track); stopCustomAudio(); }}
                   className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-left ${
                     selectedMusic.id === track.id
                       ? "border-primary bg-primary/8"
@@ -541,21 +699,48 @@ export default function ReelsStudioPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => rendererRef.current?.startRecording()}
-                    disabled={!!generatedBlob}
+                    disabled={!!generatedBlob || isUploading}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-red-500 text-white font-semibold text-sm disabled:opacity-40 active:scale-95 transition-transform">
                     <Play className="w-4 h-4" /> Record
                   </button>
-                  <button onClick={() => { setGeneratedBlob(null); setThumbnailData(""); setRecProgress(0); }}
+                  <button onClick={() => { setGeneratedBlob(null); setThumbnailData(""); setRecProgress(0); setCanvasVideoUrl(""); }}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl bg-muted text-foreground font-semibold text-sm active:scale-95 transition-transform">
                     <RefreshCw className="w-4 h-4" /> Reset
                   </button>
                 </div>
-                {generatedBlob && (
+
+                {/* Upload progress */}
+                {isUploading && (
+                  <div className="flex items-center gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-xl text-blue-700 text-xs font-medium">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    Uploading video for feed playback…
+                  </div>
+                )}
+
+                {generatedBlob && !isUploading && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs font-medium">
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                      Canvas reel ready · {(generatedBlob.size / 1024).toFixed(0)} KB
-                    </div>
+                    {/* Upload status */}
+                    {canvasVideoUrl ? (
+                      <div className="flex items-center gap-2 p-2.5 bg-green-50 border border-green-200 rounded-xl text-green-700 text-xs font-medium">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        Canvas reel ready · playable in feed · {(generatedBlob.size / 1024).toFixed(0)} KB
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2 p-2.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-700 text-xs font-medium">
+                        <Check className="w-3.5 h-3.5 shrink-0" />
+                        Canvas reel recorded · {(generatedBlob.size / 1024).toFixed(0)} KB (download only)
+                      </div>
+                    )}
+
+                    {/* In-studio preview player */}
+                    {canvasVideoUrl && (
+                      <video
+                        src={canvasVideoUrl}
+                        controls playsInline
+                        className="w-full rounded-xl max-h-48 bg-black object-contain"
+                      />
+                    )}
+
                     <button onClick={() => handleDownload()}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-xl border border-primary text-primary font-semibold text-sm hover:bg-primary/5 active:scale-95 transition-all">
                       <Download className="w-3.5 h-3.5" /> Download .webm
@@ -657,9 +842,14 @@ export default function ReelsStudioPage() {
               </div>
 
               {/* Publish readiness indicator */}
-              {!canPublish && (
+              {!canPublish && !isUploading && (
                 <p className="text-center text-xs text-muted-foreground">
                   Complete Option A or B above to unlock "Publish to Feed"
+                </p>
+              )}
+              {isUploading && (
+                <p className="text-center text-xs text-blue-600 font-medium flex items-center justify-center gap-1.5">
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" /> Uploading canvas video…
                 </p>
               )}
               {canPublish && (

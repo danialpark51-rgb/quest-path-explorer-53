@@ -2,7 +2,7 @@ import express, { type Express } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
 import path from "path";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import router from "./routes";
 import { logger } from "./lib/logger";
 
@@ -28,10 +28,15 @@ app.use(
   }),
 );
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use("/api", router);
+
+// ─── Serve uploaded reel videos ───────────────────────────────────────────────
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+app.use("/uploads", express.static(uploadsDir));
 
 const isProduction = process.env.NODE_ENV === "production";
 

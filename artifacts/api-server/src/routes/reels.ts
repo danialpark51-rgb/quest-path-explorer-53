@@ -22,6 +22,9 @@ import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { reelsTable, reelLikesTable, reelCommentsTable } from "@workspace/db";
 import { eq, desc, asc, sql, and } from "drizzle-orm";
+import { writeFileSync, mkdirSync, existsSync } from "fs";
+import path from "path";
+import { randomBytes } from "crypto";
 
 const router: IRouter = Router();
 
@@ -392,7 +395,7 @@ router.post("/reels", async (req, res) => {
       musicTrack:      String(musicTrack ?? "").slice(0, 50),
       goal:            String(goal ?? "").slice(0, 50),
       contentType:     String(contentType ?? "").slice(0, 30),
-      videoUrl:        videoUrl        ? String(videoUrl).slice(0, 2000)        : null,
+      videoUrl:        videoUrl        ? String(videoUrl).slice(0, 5_000_000)   : null,
       remixedFrom:     remixedFrom     ? String(remixedFrom).slice(0, 20)       : null,
       remixedFromUser: remixedFromUser ? String(remixedFromUser).slice(0, 50)   : null,
     }).returning();
@@ -461,6 +464,33 @@ Duration is in milliseconds (2500–4000). Hashtags should be relevant and trend
     res.json(parsed);
   } catch {
     res.status(502).json({ error: "Malformed AI response." });
+  }
+});
+
+// ─── POST /api/reels/upload-video ────────────────────────────────────────────
+// Accepts a base64-encoded video blob and saves it to disk.
+// Returns { videoUrl: "/uploads/reel-XXXX.webm" } for feed playback.
+
+router.post("/reels/upload-video", async (req, res) => {
+  const { videoData, mimeType } = req.body as { videoData?: string; mimeType?: string };
+  if (!videoData) {
+    res.status(400).json({ error: "videoData (base64) required" });
+    return;
+  }
+
+  const ext      = (mimeType ?? "video/webm").includes("mp4") ? "mp4" : "webm";
+  const filename = `reel-${randomBytes(10).toString("hex")}.${ext}`;
+  const uploadsDir = path.join(process.cwd(), "uploads");
+
+  try {
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+    const buffer = Buffer.from(videoData, "base64");
+    writeFileSync(path.join(uploadsDir, filename), buffer);
+    console.log("[upload] saved canvas video:", filename, `(${(buffer.length / 1024).toFixed(0)} KB)`);
+    res.json({ videoUrl: `/uploads/${filename}` });
+  } catch (err) {
+    console.error("[upload] failed to save video:", err);
+    res.status(500).json({ error: "Failed to save video file." });
   }
 });
 
