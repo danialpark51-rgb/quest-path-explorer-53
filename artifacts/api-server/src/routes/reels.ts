@@ -60,31 +60,33 @@ async function callAI(prompt: string): Promise<string | null> {
   }
 }
 
-// ─── Pika API Integration ─────────────────────────────────────────────────────
+// ─── fal.ai Video Generation ──────────────────────────────────────────────────
 //
-// Integration supports two Pika access paths, tried in order:
-//   1. Pika direct API (api.pika.art) — for partner / beta API keys
-//   2. pikapikapika.io community wrapper — alternative access path
+// Uses the fal.ai queue API to generate real AI videos.
+// Models tried in order:
+//   1. fal-ai/kling-video/v1/standard/text-to-video  — high quality, 9:16 native
+//   2. fal-ai/minimax-video/text-to-video            — fast fallback
 //
-// To add more providers (Runway ML, Kling AI, Sora, Luma Dream Machine):
-//   Implement another attempt block below following the same pattern.
+// API key: FAL_API_KEY environment variable (format: "KEY_ID:KEY_SECRET")
+// Docs:    https://fal.ai/docs/model-endpoints/queue
 //
-// API key is stored as PIKA_API_KEY environment secret.
+// Queue flow:
+//   POST https://queue.fal.run/{model}                         → { request_id }
+//   GET  https://queue.fal.run/{model}/requests/{id}/status    → { status }
+//   GET  https://queue.fal.run/{model}/requests/{id}           → { output: { video: { url } } }
 
-type PikaStartResult =
-  | { jobId: string; provider: "pika-direct" | "pikapikapika" }
-  | { error: string };
+const FAL_MODELS = [
+  "fal-ai/kling-video/v1/standard/text-to-video",
+  "fal-ai/minimax-video/text-to-video",
+];
 
-type PikaStatusResult = {
+type FalStatusResult = {
   status: "pending" | "processing" | "finished" | "failed";
   videoUrl?: string;
 };
 
-/**
- * Build an AI-optimised prompt for Pika video generation.
- * The prompt is designed to produce cinematic, youth-friendly educational reels.
- */
-function buildPikaPrompt(
+/** Build an optimised text-to-video prompt for educational reels. */
+function buildVideoPrompt(
   title: string,
   scenes: Array<{ text?: string; subtext?: string }>,
   templateName: string,
@@ -102,136 +104,120 @@ function buildPikaPrompt(
     `Colors: vibrant gradients ${gradientColors.join(" to ")}.`,
     "Visual: bold typography reveals, particle effects, light leaks, smooth transitions.",
     "Mood: motivational, aspirational, social-media-ready.",
-    "Format: vertical 9:16, 3 seconds, studio-quality.",
+    "Format: vertical 9:16, 5 seconds, studio-quality.",
   ].filter(Boolean).join(" ").slice(0, 600);
 }
 
-/** Start a Pika video generation job. Returns a jobId on success. */
-async function startPikaGeneration(prompt: string): Promise<PikaStartResult> {
-  const apiKey = process.env.PIKA_API_KEY;
+/** Submit a fal.ai video generation job. Returns jobId + provider model on success. */
+async function startFalGeneration(
+  prompt: string,
+): Promise<{ jobId: string; provider: string } | { error: string }> {
+  const apiKey = process.env.FAL_API_KEY;
   if (!apiKey) {
-    return {
-      error: "Pika API key not configured. Add PIKA_API_KEY to your environment secrets.",
-    };
+    return { error: "FAL_API_KEY not configured. Add it to your environment secrets." };
   }
 
-  // ── Attempt 1: Pika direct API (api.pika.art) ─────────────────────────────
-  // Used by partner / beta programme API keys (UUID:hash format).
-  try {
-    const r = await fetch("https://api.pika.art/v1/generate/text", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        promptText: prompt,
-        options: {
-          aspectRatio: "9:16",
-          frameRate: 24,
-          duration: 3,
-          parameters: { motion: 2, guidanceScale: 12 },
+  for (const model of FAL_MODELS) {
+    try {
+      const r = await fetch(`https://queue.fal.run/${model}`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Key ${apiKey}`,
+          "Content-Type": "application/json",
         },
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (r.ok) {
-      const d = await r.json() as Record<string, unknown>;
-      const jobId = String(d.id ?? d.videoId ?? d.job_id ?? "");
-      if (jobId) {
-        console.log("[pika] started via pika-direct, jobId:", jobId);
-        return { jobId, provider: "pika-direct" };
+        body: JSON.stringify({
+          prompt,
+          duration: "5",
+          aspect_ratio: "9:16",
+        }),
+        signal: AbortSignal.timeout(20_000),
+      });
+
+      if (r.ok) {
+        const d = await r.json() as { request_id?: string };
+        if (d.request_id) {
+          console.log(`[fal] submitted ${model}, request_id:`, d.request_id);
+          return { jobId: d.request_id, provider: model };
+        }
+        console.warn(`[fal] ${model} responded OK but no request_id:`, JSON.stringify(d).slice(0, 200));
+      } else {
+        const errText = await r.text().catch(() => "");
+        console.warn(`[fal] ${model} → ${r.status}:`, errText.slice(0, 300));
       }
-    } else {
-      console.warn("[pika] pika-direct returned", r.status, await r.text().catch(() => ""));
+    } catch (e) {
+      console.warn(`[fal] ${model} request threw:`, (e as Error).message);
     }
-  } catch (e) {
-    console.warn("[pika] pika-direct attempt failed:", (e as Error).message);
   }
 
-  // ── Attempt 2: pikapikapika.io community wrapper ──────────────────────────
-  // Alternative access path; uses the same API key as Bearer token.
-  try {
-    const r = await fetch("https://api.pikapikapika.io/web/generate", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        prompts: prompt,
-        options: {
-          frameRate: 24,
-          aspectRatio: "9:16",
-          cameraControl: { type: "zoom_in" },
-          parameters: { motion: 1, guidanceScale: 12 },
-        },
-      }),
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (r.ok) {
-      const d = await r.json() as { videos?: Array<{ id: string }> };
-      const jobId = d.videos?.[0]?.id ?? "";
-      if (jobId) {
-        console.log("[pika] started via pikapikapika, jobId:", jobId);
-        return { jobId, provider: "pikapikapika" };
-      }
-    } else {
-      console.warn("[pika] pikapikapika returned", r.status, await r.text().catch(() => ""));
-    }
-  } catch (e) {
-    console.warn("[pika] pikapikapika attempt failed:", (e as Error).message);
-  }
-
-  return {
-    error:
-      "Could not reach Pika API. Check that PIKA_API_KEY is correct and the service is reachable.",
-  };
+  return { error: "Could not start AI video generation. Verify FAL_API_KEY and try again." };
 }
 
-/** Poll a Pika job for its status and final video URL. */
-async function getPikaStatus(jobId: string, provider: string): Promise<PikaStatusResult> {
-  const apiKey = process.env.PIKA_API_KEY;
+/** Poll a fal.ai job for completion and extract the video URL when done. */
+async function getFalStatus(jobId: string, provider: string): Promise<FalStatusResult> {
+  const apiKey = process.env.FAL_API_KEY;
   if (!apiKey) return { status: "failed" };
 
-  if (provider === "pikapikapika") {
-    try {
-      const r = await fetch(`https://api.pikapikapika.io/web/videos/${jobId}`, {
-        headers: { "Authorization": `Bearer ${apiKey}` },
+  try {
+    // Step 1 — check queue status
+    const statusRes = await fetch(
+      `https://queue.fal.run/${provider}/requests/${jobId}/status`,
+      {
+        headers: { "Authorization": `Key ${apiKey}` },
         signal: AbortSignal.timeout(12_000),
-      });
-      if (r.ok) {
-        const d = await r.json() as { video?: { status?: string; resultUrl?: string } };
-        const v = d.video ?? {};
-        const status: PikaStatusResult["status"] =
-          v.status === "finished" ? "finished" :
-          v.status === "failed"   ? "failed"   : "processing";
-        return { status, videoUrl: v.resultUrl };
-      }
-    } catch { /* fall through */ }
-  } else {
-    // pika-direct
-    try {
-      const r = await fetch(`https://api.pika.art/v1/videos/${jobId}`, {
-        headers: { "Authorization": `Bearer ${apiKey}` },
-        signal: AbortSignal.timeout(12_000),
-      });
-      if (r.ok) {
-        const d = await r.json() as {
-          status?: string;
-          resultUrl?: string;
-          video_url?: string;
-          url?: string;
-        };
-        const status: PikaStatusResult["status"] =
-          d.status === "finished" ? "finished" :
-          d.status === "failed"   ? "failed"   : "processing";
-        return { status, videoUrl: d.resultUrl ?? d.video_url ?? d.url };
-      }
-    } catch { /* fall through */ }
-  }
+      },
+    );
 
-  return { status: "processing" };
+    if (!statusRes.ok) {
+      console.warn("[fal] status endpoint returned", statusRes.status);
+      return { status: "processing" };
+    }
+
+    const statusData = await statusRes.json() as { status?: string };
+    const falStatus = (statusData.status ?? "").toUpperCase();
+    console.log(`[fal] ${jobId} status:`, falStatus);
+
+    if (falStatus === "COMPLETED") {
+      // Step 2 — fetch the full result to extract the video URL
+      const resultRes = await fetch(
+        `https://queue.fal.run/${provider}/requests/${jobId}`,
+        {
+          headers: { "Authorization": `Key ${apiKey}` },
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+
+      if (resultRes.ok) {
+        const result = await resultRes.json() as {
+          video?: { url?: string };
+          output?: { video?: { url?: string } | Array<{ url?: string }> };
+        };
+
+        // Normalise across different model output shapes
+        let videoUrl: string | undefined;
+        const vid = result.output?.video ?? result.video;
+        if (Array.isArray(vid)) {
+          videoUrl = vid[0]?.url;
+        } else if (vid && typeof vid === "object") {
+          videoUrl = (vid as { url?: string }).url;
+        }
+
+        console.log("[fal] finished, videoUrl:", videoUrl?.slice(0, 100));
+        return { status: "finished", videoUrl };
+      }
+      // Result fetch failed but job is done — return finished without URL
+      return { status: "finished" };
+    }
+
+    if (falStatus === "FAILED" || falStatus === "ERROR") {
+      return { status: "failed" };
+    }
+
+    // QUEUED / IN_PROGRESS
+    return { status: "processing" };
+  } catch (e) {
+    console.warn("[fal] status poll error:", (e as Error).message);
+    return { status: "processing" };
+  }
 }
 
 // ─── GET /api/reels ───────────────────────────────────────────────────────────
@@ -495,7 +481,7 @@ router.post("/reels/upload-video", async (req, res) => {
 });
 
 // ─── POST /api/reels/pika-generate ───────────────────────────────────────────
-// Starts an async Pika video generation job.
+// Submits a fal.ai video generation job (endpoint name kept for frontend compat).
 // Returns { jobId, provider } on success for the client to poll.
 
 router.post("/reels/pika-generate", async (req, res) => {
@@ -508,16 +494,16 @@ router.post("/reels/pika-generate", async (req, res) => {
     gradientColors?: string[];
   };
 
-  const prompt = buildPikaPrompt(
+  const prompt = buildVideoPrompt(
     String(title ?? "Student Achievement"),
     scenes ?? [],
     String(templateName ?? "Study Motivation"),
     gradientColors ?? ["#6C3483", "#1A5276"],
   );
 
-  console.log("[pika] generating with prompt:", prompt.slice(0, 120), "…");
+  console.log("[fal] generating with prompt:", prompt.slice(0, 120), "…");
 
-  const result = await startPikaGeneration(prompt);
+  const result = await startFalGeneration(prompt);
 
   if ("error" in result) {
     res.status(503).json({ error: result.error });
@@ -528,13 +514,13 @@ router.post("/reels/pika-generate", async (req, res) => {
 });
 
 // ─── GET /api/reels/pika-status/:jobId ───────────────────────────────────────
-// Polls the Pika job until it finishes. The client calls this every ~4 seconds.
+// Polls the fal.ai job status (endpoint name kept for frontend compat).
 // Returns { status: "pending"|"processing"|"finished"|"failed", videoUrl? }
 
 router.get("/reels/pika-status/:jobId", async (req, res) => {
   const { jobId } = req.params;
-  const provider  = String(req.query.provider ?? "pika-direct");
-  const result    = await getPikaStatus(jobId, provider);
+  const provider  = String(req.query.provider ?? FAL_MODELS[0]);
+  const result    = await getFalStatus(jobId, provider);
   res.json(result);
 });
 

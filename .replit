@@ -87,6 +87,7 @@ externalPort = 80
 
 [userenv.shared]
 GOOGLE_CLIENT_ID = "1049409999108-bkqde3mntr47p4e12bgl05sobrvk8vn7.apps.googleusercontent.com"
+FAL_API_KEY = "31578284-8e15-4b74-84cb-cc08161b6964:823d78cfcd0df84735286795734ef86d"
 
 [nix]
 channel = "stable-25_05"

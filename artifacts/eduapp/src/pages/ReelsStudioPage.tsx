@@ -4,7 +4,7 @@
  * Step 0 – Content  : What are you showcasing?
  * Step 1 – Template : Choose your visual style
  * Step 2 – Music    : Pick a soundtrack
- * Step 3 – Preview  : Canvas preview + record canvas OR generate with Pika AI
+ * Step 3 – Preview  : Canvas preview + record canvas OR generate with fal.ai AI Video
  * Step 4 – Share    : Published! Share everywhere
  *
  * Remix mode: visit /reels/studio?remixFrom={reelId}&template={tplId}&remixUsername={user}
@@ -163,7 +163,7 @@ export default function ReelsStudioPage() {
           setPikaState("failed");
           clearInterval(pikaPollerRef.current!);
           pikaPollerRef.current = null;
-          setError("Pika video generation failed. You can still use the canvas recording below.");
+          setError("AI video generation failed. You can still use the canvas recording below.");
         }
 
         // Timeout guard
@@ -171,7 +171,7 @@ export default function ReelsStudioPage() {
           setPikaState("failed");
           clearInterval(pikaPollerRef.current!);
           pikaPollerRef.current = null;
-          setError("Pika generation timed out. Try again or use canvas recording.");
+          setError("AI video generation timed out. Try again or use canvas recording.");
         }
       } catch { /* network hiccup — keep polling */ }
     };
@@ -226,10 +226,10 @@ export default function ReelsStudioPage() {
         }),
       });
       const data = await res.json() as { jobId?: string; provider?: string; error?: string };
-      if (!res.ok || !data.jobId) throw new Error(data.error ?? "Failed to start Pika generation");
+      if (!res.ok || !data.jobId) throw new Error(data.error ?? "Failed to start AI video generation");
 
       setPikaJobId(data.jobId);
-      setPikaProvider(data.provider ?? "pika-direct");
+      setPikaProvider(data.provider ?? "fal-ai/kling-video/v1/standard/text-to-video");
       setPikaState("polling");
       setPikaProgress(12);
     } catch (e) {
@@ -358,7 +358,7 @@ export default function ReelsStudioPage() {
 
   const goNext = () => {
     if (step === 3 && !canPublish) {
-      setError("Record the canvas reel or generate a Pika AI video first.");
+      setError("Record the canvas reel or generate an AI video first.");
       return;
     }
     if (step === 3) { handlePublish(); return; }
@@ -658,7 +658,7 @@ export default function ReelsStudioPage() {
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Record your reel <strong>or</strong> generate a real video with Pika AI
+                Record your reel <strong>or</strong> generate a real video with fal.ai
               </p>
 
               {/* Canvas live preview */}
@@ -749,7 +749,7 @@ export default function ReelsStudioPage() {
                 )}
               </div>
 
-              {/* ── Option B: Pika AI video generation ─────────────────── */}
+              {/* ── Option B: fal.ai video generation ──────────────────── */}
               <div className="rounded-2xl overflow-hidden border border-violet-200">
                 {/* Header */}
                 <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center gap-3">
@@ -757,8 +757,8 @@ export default function ReelsStudioPage() {
                     <Wand2 className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-white">Option B — Pika AI Real Video</p>
-                    <p className="text-xs text-white/75">Generates an actual MP4 using Pika AI</p>
+                    <p className="font-bold text-sm text-white">Option B — AI Video Generation</p>
+                    <p className="text-xs text-white/75">Generates a real MP4 video with fal.ai</p>
                   </div>
                   {pikaState === "done" && (
                     <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
@@ -772,14 +772,14 @@ export default function ReelsStudioPage() {
                   {pikaState === "idle" && (
                     <button onClick={generateWithPika}
                       className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
-                      <Wand2 className="w-4 h-4" /> Generate with Pika AI
+                      <Wand2 className="w-4 h-4" /> Generate AI Video
                     </button>
                   )}
 
                   {/* STARTING */}
                   {pikaState === "starting" && (
                     <div className="flex items-center gap-2 text-violet-700 text-sm font-medium py-1">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Connecting to Pika…
+                      <Loader2 className="w-4 h-4 animate-spin" /> Connecting to fal.ai…
                     </div>
                   )}
 
@@ -789,7 +789,7 @@ export default function ReelsStudioPage() {
                       <div className="flex items-center justify-between text-xs font-medium text-violet-700">
                         <span className="flex items-center gap-1.5">
                           <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          Pika is generating your video…
+                          AI is generating your video…
                         </span>
                         <span>{pikaEta > 0 ? `~${pikaEta}s` : "Almost done…"}</span>
                       </div>
@@ -807,7 +807,7 @@ export default function ReelsStudioPage() {
                   {pikaState === "done" && pikaVideoUrl && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-green-700 text-sm font-bold">
-                        <Check className="w-4 h-4" /> Pika video generated! 🎉
+                        <Check className="w-4 h-4" /> AI video generated! 🎉
                       </div>
                       <video
                         src={pikaVideoUrl}
@@ -854,7 +854,7 @@ export default function ReelsStudioPage() {
               )}
               {canPublish && (
                 <p className="text-center text-xs text-primary font-semibold">
-                  ✅ {pikaVideoUrl ? "Pika AI video" : "Canvas recording"} ready — tap Publish!
+                  ✅ {pikaVideoUrl ? "AI video" : "Canvas recording"} ready — tap Publish!
                 </p>
               )}
 
@@ -880,11 +880,11 @@ export default function ReelsStudioPage() {
                 </p>
               </motion.div>
 
-              {/* Pika video if generated */}
+              {/* AI video if generated */}
               {pikaVideoUrl && (
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <Video className="w-3.5 h-3.5" /> Your Pika AI Video
+                    <Video className="w-3.5 h-3.5" /> Your AI Video
                   </p>
                   <video src={pikaVideoUrl} controls playsInline
                     className="w-full rounded-2xl max-h-64 bg-black object-contain shadow-lg" />

@@ -410,7 +410,7 @@ function ReelCardItem({
               <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{reel.goal}</span>
             )}
             {reel.videoUrl && (
-              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">🎬 Pika AI</span>
+              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">🎬 AI Video</span>
             )}
           </div>
 
