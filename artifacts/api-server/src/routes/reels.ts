@@ -108,6 +108,33 @@ function buildVideoPrompt(
   ].filter(Boolean).join(" ").slice(0, 600);
 }
 
+/** Download a fal.ai video to local /uploads/ so it persists permanently. */
+async function downloadAndSaveFalVideo(falUrl: string): Promise<string | null> {
+  try {
+    const uploadsDir = path.join(process.cwd(), "uploads");
+    if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+    const res = await fetch(falUrl, { signal: AbortSignal.timeout(120_000) });
+    if (!res.ok || !res.body) {
+      console.warn("[fal] download failed, status:", res.status);
+      return null;
+    }
+
+    const contentType = res.headers.get("content-type") ?? "video/mp4";
+    const ext = contentType.includes("webm") ? "webm" : "mp4";
+    const filename = `fal-${randomBytes(10).toString("hex")}.${ext}`;
+    const filepath = path.join(uploadsDir, filename);
+
+    const buffer = Buffer.from(await res.arrayBuffer());
+    writeFileSync(filepath, buffer);
+    console.log("[fal] saved video locally:", filename, `(${(buffer.length / 1024 / 1024).toFixed(1)} MB)`);
+    return `/uploads/${filename}`;
+  } catch (e) {
+    console.warn("[fal] failed to download video:", (e as Error).message);
+    return null;
+  }
+}
+
 /** Submit a fal.ai video generation job. Returns jobId + provider model on success. */
 async function startFalGeneration(
   prompt: string,
@@ -127,7 +154,7 @@ async function startFalGeneration(
         },
         body: JSON.stringify({
           prompt,
-          duration: "5",
+          duration: 5,
           aspect_ratio: "9:16",
         }),
         signal: AbortSignal.timeout(20_000),
@@ -182,7 +209,7 @@ async function getFalStatus(jobId: string, provider: string): Promise<FalStatusR
         `https://queue.fal.run/${provider}/requests/${jobId}`,
         {
           headers: { "Authorization": `Key ${apiKey}` },
-          signal: AbortSignal.timeout(12_000),
+          signal: AbortSignal.timeout(30_000),
         },
       );
 
@@ -190,19 +217,32 @@ async function getFalStatus(jobId: string, provider: string): Promise<FalStatusR
         const result = await resultRes.json() as {
           video?: { url?: string };
           output?: { video?: { url?: string } | Array<{ url?: string }> };
+          videos?: Array<{ url?: string }>;
         };
 
-        // Normalise across different model output shapes
-        let videoUrl: string | undefined;
+        // Normalise across different model output shapes:
+        // Kling:   { video: { url } }
+        // MiniMax: { video: { url } } or { output: { video: { url } } }
+        // Some:    { videos: [{ url }] }
+        let falVideoUrl: string | undefined;
         const vid = result.output?.video ?? result.video;
         if (Array.isArray(vid)) {
-          videoUrl = vid[0]?.url;
+          falVideoUrl = vid[0]?.url;
         } else if (vid && typeof vid === "object") {
-          videoUrl = (vid as { url?: string }).url;
+          falVideoUrl = (vid as { url?: string }).url;
+        }
+        if (!falVideoUrl && Array.isArray(result.videos)) {
+          falVideoUrl = result.videos[0]?.url;
         }
 
-        console.log("[fal] finished, videoUrl:", videoUrl?.slice(0, 100));
-        return { status: "finished", videoUrl };
+        console.log("[fal] finished, remote videoUrl:", falVideoUrl?.slice(0, 100));
+
+        if (falVideoUrl) {
+          // Download to local /uploads/ so the URL never expires
+          const localUrl = await downloadAndSaveFalVideo(falVideoUrl);
+          const finalUrl = localUrl ?? falVideoUrl; // fallback to CDN if download fails
+          return { status: "finished", videoUrl: finalUrl };
+        }
       }
       // Result fetch failed but job is done — return finished without URL
       return { status: "finished" };

@@ -144,7 +144,7 @@ export default function ReelsStudioPage() {
 
     const poll = async () => {
       try {
-        const res  = await API(`/reels/pika-status/${pikaJobId}?provider=${pikaProvider}`);
+        const res  = await API(`/reels/pika-status/${pikaJobId}?provider=${encodeURIComponent(pikaProvider)}`);
         const data = await res.json() as { status: string; videoUrl?: string };
 
         // Update simulated progress (grows to 90% while waiting)

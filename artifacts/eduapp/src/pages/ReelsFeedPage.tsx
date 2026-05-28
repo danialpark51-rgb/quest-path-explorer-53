@@ -433,18 +433,8 @@ function ReelCardItem({
         </div>
       </div>
 
-      {/* Pika AI video player */}
-      {reel.videoUrl && (
-        <div className="rounded-xl overflow-hidden bg-black">
-          <video
-            src={reel.videoUrl}
-            controls
-            playsInline
-            preload="metadata"
-            className="w-full max-h-52 object-contain"
-          />
-        </div>
-      )}
+      {/* AI / canvas video player */}
+      {reel.videoUrl && <ReelVideoPlayer url={reel.videoUrl} />}
 
       {/* Action bar */}
       <div className="flex items-center gap-4 pt-1">
@@ -529,6 +519,56 @@ function ReelCardItem({
         )}
       </AnimatePresence>
     </motion.div>
+  );
+}
+
+// ─── Reel Video Player ────────────────────────────────────────────────────────
+
+function ReelVideoPlayer({ url }: { url: string }) {
+  const [errored, setErrored] = useState(false);
+
+  // Detect MIME type from extension so browsers get a proper hint
+  const mimeType = url.endsWith(".webm")
+    ? "video/webm"
+    : url.endsWith(".mp4")
+    ? "video/mp4"
+    : url.endsWith(".mov")
+    ? "video/quicktime"
+    : "video/mp4"; // safe default for fal.ai output
+
+  if (errored) {
+    return (
+      <div className="rounded-xl bg-black/80 flex flex-col items-center justify-center gap-2 py-6 px-4 text-center">
+        <span className="text-3xl">🎬</span>
+        <p className="text-white/70 text-xs">
+          Video unavailable —{" "}
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="underline text-white/90"
+          >
+            open directly
+          </a>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-black">
+      <video
+        controls
+        playsInline
+        preload="metadata"
+        className="w-full max-h-52 object-contain"
+        onError={() => setErrored(true)}
+      >
+        <source src={url} type={mimeType} />
+        {/* Fallback source without explicit type so the browser tries anyway */}
+        <source src={url} />
+      </video>
+    </div>
   );
 }
 
