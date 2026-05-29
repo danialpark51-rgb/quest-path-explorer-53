@@ -1,17 +1,20 @@
 /**
- * Skill Reels AI Studio — Multi-step wizard
+ * Skill Reels Studio — Multi-step wizard
  *
  * Step 0 – Content  : What are you showcasing?
- * Step 1 – Template : Choose your visual style
- * Step 2 – Music    : Pick a soundtrack
- * Step 3 – Preview  : Canvas preview + AI video generation with fal.ai
+ * Step 1 – Template : Choose your visual style (12 templates)
+ * Step 2 – Music    : Pick a soundtrack or upload your own
+ * Step 3 – Preview  : Canvas preview + record reel (canvas MediaRecorder)
  * Step 4 – Share    : Published! Share everywhere
+ *
+ * Video generation: canvas-based MediaRecorder (no external AI video APIs).
+ * Music: user upload OR preset track selection.
  *
  * Remix mode: visit /reels/studio?remixFrom={reelId}&template={tplId}&remixUsername={user}
  * to pre-populate the template and show a "Remixing from @user" banner.
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -19,6 +22,7 @@ import {
   Share2, Loader2, Music, Palette, Film, Upload,
   Play, Trophy, Wand2, RefreshCcw,
   ExternalLink, Video, ImagePlus, X as XIcon, CloudUpload,
+  Circle, Download,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
@@ -39,7 +43,7 @@ type ContentForm = {
   imageUrl: string;
 };
 
-type PikaState = "idle" | "starting" | "polling" | "done" | "failed" | "billing";
+type RecordState = "idle" | "recording" | "uploading" | "done" | "failed";
 
 const STEP_LABELS = ["Content", "Template", "Music", "Preview", "Share"];
 const STEP_ICONS  = [Upload, Palette, Music, Film, Share2];
@@ -77,19 +81,15 @@ export default function ReelsStudioPage() {
 
   const rendererRef = useRef<ReelRendererHandle>(null);
 
-  // ── Pika AI video generation ───────────────────────────────────────────────
-  const [pikaState,      setPikaState]      = useState<PikaState>("idle");
-  const [pikaJobId,      setPikaJobId]      = useState("");
-  const [pikaProvider,   setPikaProvider]   = useState("");
-  const [pikaVideoUrl,   setPikaVideoUrl]   = useState("");
-  const [pikaProgress,   setPikaProgress]   = useState(0);
-  const [pikaEta,        setPikaEta]        = useState(0); // seconds remaining estimate
-  const pikaPollerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pikaStartRef  = useRef<number>(0);
+  // ── Canvas recording state ─────────────────────────────────────────────────
+  const [recordState,    setRecordState]    = useState<RecordState>("idle");
+  const [recordProgress, setRecordProgress] = useState(0);
+  const [canvasVideoUrl, setCanvasVideoUrl] = useState("");
+  const [canvasVideoBlob, setCanvasVideoBlob] = useState<Blob | null>(null);
 
   // ── Custom media (image attachment + audio upload) ─────────────────────────
   const [customAudioFile, setCustomAudioFile] = useState<File | null>(null);
-  const [customAudioUrl,  setCustomAudioUrl]  = useState("");   // object URL for playback
+  const [customAudioUrl,  setCustomAudioUrl]  = useState("");
   const [customAudioName, setCustomAudioName] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -113,54 +113,6 @@ export default function ReelsStudioPage() {
     setSelectedTemplate(tpl);
     rebuildScenes(form, tpl);
   };
-
-  // ── Pika polling effect ────────────────────────────────────────────────────
-  useEffect(() => {
-    if (pikaState !== "polling" || !pikaJobId) return;
-
-    pikaStartRef.current = Date.now();
-    const MAX_WAIT_MS = 3 * 60 * 1000; // 3 min max
-
-    const poll = async () => {
-      try {
-        const res  = await API(`/reels/pika-status/${pikaJobId}?provider=${encodeURIComponent(pikaProvider)}`);
-        const data = await res.json() as { status: string; videoUrl?: string };
-
-        // Update simulated progress (grows to 90% while waiting)
-        const elapsed = Date.now() - pikaStartRef.current;
-        const simPct  = Math.min(90, Math.round((elapsed / 80_000) * 90));
-        setPikaProgress(simPct);
-        setPikaEta(Math.max(0, Math.round((80_000 - elapsed) / 1000)));
-
-        if (data.status === "finished" && data.videoUrl) {
-          setPikaVideoUrl(data.videoUrl);
-          setPikaState("done");
-          setPikaProgress(100);
-          clearInterval(pikaPollerRef.current!);
-          pikaPollerRef.current = null;
-        } else if (data.status === "failed") {
-          setPikaState("failed");
-          clearInterval(pikaPollerRef.current!);
-          pikaPollerRef.current = null;
-          setError("AI video generation failed. Please try again — the server will retry all available models.");
-        }
-
-        // Timeout guard
-        if (elapsed > MAX_WAIT_MS) {
-          setPikaState("failed");
-          clearInterval(pikaPollerRef.current!);
-          pikaPollerRef.current = null;
-          setError("AI video generation timed out. Please try again.");
-        }
-      } catch { /* network hiccup — keep polling */ }
-    };
-
-    pikaPollerRef.current = setInterval(poll, 4000);
-    poll(); // immediate first check
-    return () => {
-      if (pikaPollerRef.current) clearInterval(pikaPollerRef.current);
-    };
-  }, [pikaState, pikaJobId, pikaProvider]);
 
   // ── OpenAI scene generation ────────────────────────────────────────────────
   const generateWithAI = async () => {
@@ -186,41 +138,59 @@ export default function ReelsStudioPage() {
     }
   };
 
-  // ── Pika AI video generation ───────────────────────────────────────────────
-  const generateWithPika = async () => {
-    if (scenes.length === 0) { setError("Complete content setup in Step 1 first."); return; }
+  // ── Canvas recording ───────────────────────────────────────────────────────
+  const handleRecordComplete = useCallback(async (blob: Blob, _thumbnail: string) => {
+    setCanvasVideoBlob(blob);
+    setRecordState("uploading");
     setError("");
-    setPikaState("starting");
-    setPikaProgress(5);
-    setPikaVideoUrl("");
-
     try {
-      const res  = await API("/reels/pika-generate", {
-        method: "POST",
-        body: JSON.stringify({
-          title:          form.title || "Student Achievement",
-          scenes:         scenes.slice(0, 3),
-          templateName:   selectedTemplate.name,
-          gradientColors: selectedTemplate.gradient,
-        }),
-      });
-      const data = await res.json() as { jobId?: string; provider?: string; error?: string };
-      if (!res.ok || !data.jobId) throw new Error(data.error ?? "Failed to start AI video generation");
+      // Convert blob to base64 and upload to server
+      const arrayBuffer = await blob.arrayBuffer();
+      const uint8 = new Uint8Array(arrayBuffer);
+      let binary = "";
+      for (let i = 0; i < uint8.length; i++) binary += String.fromCharCode(uint8[i]);
+      const base64 = btoa(binary);
 
-      setPikaJobId(data.jobId);
-      setPikaProvider(data.provider ?? "fal-ai/kling-video/v1/standard/text-to-video");
-      setPikaState("polling");
-      setPikaProgress(12);
+      const res = await fetch("/api/reels/upload-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoData: base64, mimeType: blob.type }),
+      });
+      const data = await res.json() as { videoUrl?: string; error?: string };
+      if (!res.ok || !data.videoUrl) throw new Error(data.error ?? "Upload failed");
+      setCanvasVideoUrl(data.videoUrl);
+      setRecordState("done");
     } catch (e) {
-      const msg = (e as Error).message ?? "";
-      setPikaProgress(0);
-      if (msg.startsWith("BILLING_ERROR:")) {
-        setPikaState("billing");
-      } else {
-        setPikaState("failed");
-        setError(msg);
-      }
+      setError((e as Error).message);
+      setRecordState("failed");
     }
+  }, []);
+
+  const startRecording = () => {
+    setRecordState("recording");
+    setRecordProgress(0);
+    setCanvasVideoUrl("");
+    setCanvasVideoBlob(null);
+    setError("");
+    rendererRef.current?.startRecording();
+  };
+
+  const resetRecording = () => {
+    setRecordState("idle");
+    setRecordProgress(0);
+    setCanvasVideoUrl("");
+    setCanvasVideoBlob(null);
+  };
+
+  // Download the recorded video locally
+  const downloadVideo = () => {
+    if (!canvasVideoBlob && !canvasVideoUrl) return;
+    const url = canvasVideoBlob ? URL.createObjectURL(canvasVideoBlob) : canvasVideoUrl;
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `edupath-reel-${Date.now()}.webm`;
+    a.click();
+    if (canvasVideoBlob) setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   // ── Image file attachment ──────────────────────────────────────────────────
@@ -285,7 +255,7 @@ export default function ReelsStudioPage() {
           musicTrack:      selectedMusic.id === "custom" ? `custom:${customAudioName}` : selectedMusic.id,
           goal:            user.selectedGoal ?? "",
           contentType:     form.contentType,
-          videoUrl:        pikaVideoUrl || null,
+          videoUrl:        canvasVideoUrl || null,
           remixedFrom:     remixFromId    || null,
           remixedFromUser: remixUsername  || null,
         }),
@@ -302,11 +272,12 @@ export default function ReelsStudioPage() {
 
   // ── Step navigation ────────────────────────────────────────────────────────
   const canProceedStep0 = form.title.trim().length > 0;
-  const canPublish      = pikaVideoUrl !== "";
+  // Can publish once canvas video is recorded OR directly without video
+  const canPublish = recordState === "done";
 
   const goNext = () => {
     if (step === 3 && !canPublish) {
-      setError("Generate an AI video first to unlock Publish to Feed.");
+      setError("Record your reel first to unlock Publish to Feed.");
       return;
     }
     if (step === 3) { handlePublish(); return; }
@@ -317,11 +288,14 @@ export default function ReelsStudioPage() {
 
   const resetAll = () => {
     setStep(0); setForm(EMPTY_FORM);
-    setPikaState("idle"); setPikaJobId(""); setPikaVideoUrl(""); setPikaProgress(0);
+    setRecordState("idle"); setRecordProgress(0); setCanvasVideoUrl(""); setCanvasVideoBlob(null);
     stopCustomAudio();
     if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
     setCustomAudioFile(null); setCustomAudioUrl(""); setCustomAudioName("");
   };
+
+  // Total reel duration label
+  const totalSec = (scenes.reduce((s, sc) => s + sc.duration, 0) / 1000).toFixed(1);
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -336,10 +310,10 @@ export default function ReelsStudioPage() {
           <h1 className="font-bold text-base text-foreground">
             {remixFromId ? "Remix Studio" : "Skill Reels Studio"}
           </h1>
-          <p className="text-xs text-muted-foreground">AI-powered reel creator</p>
+          <p className="text-xs text-muted-foreground">Template-powered reel creator</p>
         </div>
         <span className="text-xs bg-primary/10 text-primary font-semibold px-2.5 py-1 rounded-full">
-          ✨ AI
+          🎬 Studio
         </span>
       </div>
 
@@ -506,8 +480,8 @@ export default function ReelsStudioPage() {
                     <div className="h-28 w-full flex flex-col items-center justify-center gap-1"
                       style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}>
                       <span className="text-3xl">{tpl.emoji}</span>
-                      <span className="text-white font-bold text-xs drop-shadow-md">{tpl.name}</span>
-                      <span className="text-white/70 text-[10px] px-2 text-center leading-tight">{tpl.description}</span>
+                      <span className="font-bold text-xs drop-shadow-md" style={{ color: tpl.textColor }}>{tpl.name}</span>
+                      <span className="text-[10px] px-2 text-center leading-tight opacity-80" style={{ color: tpl.subtextColor }}>{tpl.description}</span>
                     </div>
                     <div className="bg-card px-2 py-1.5 flex items-center justify-between">
                       <span className="text-xs text-muted-foreground capitalize">{tpl.transition}</span>
@@ -601,11 +575,11 @@ export default function ReelsStudioPage() {
             </div>
           )}
 
-          {/* ── STEP 3: Preview & Generate ───────────────────────────────── */}
+          {/* ── STEP 3: Preview & Record ─────────────────────────────────── */}
           {step === 3 && (
             <div className="space-y-4">
               <p className="text-sm text-muted-foreground text-center">
-                Preview your reel, then generate a real AI video with fal.ai
+                Preview your reel, then record it as a video file
               </p>
 
               {/* Canvas live preview */}
@@ -615,13 +589,15 @@ export default function ReelsStudioPage() {
                   scenes={scenes}
                   template={selectedTemplate}
                   displayWidth={250}
+                  onRecordComplete={handleRecordComplete}
+                  onProgress={p => setRecordProgress(p)}
                 />
               </div>
 
               {/* Scene summary */}
               <div className="bg-muted/50 rounded-xl p-3 space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  Scenes ({scenes.length})
+                  Scenes ({scenes.length}) · {totalSec}s total
                 </p>
                 {scenes.map((sc, i) => (
                   <div key={sc.id} className="flex items-start gap-2">
@@ -637,125 +613,107 @@ export default function ReelsStudioPage() {
                 ))}
               </div>
 
-              {/* ── AI Video Generation ─────────────────────────────────── */}
-              <div className="rounded-2xl overflow-hidden border border-violet-200">
+              {/* ── Reel Recorder ───────────────────────────────────────── */}
+              <div className="rounded-2xl overflow-hidden border border-border">
                 {/* Header */}
-                <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-3 flex items-center gap-3">
+                <div className="bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
                     <Wand2 className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-white">AI Video Generation</p>
-                    <p className="text-xs text-white/75">Generates a real MP4 video with fal.ai</p>
+                    <p className="font-bold text-sm text-white">Record Your Reel</p>
+                    <p className="text-xs text-white/75">
+                      Template + canvas = MP4/WebM — no external API needed
+                    </p>
                   </div>
-                  {pikaState === "done" && (
+                  {recordState === "done" && (
                     <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
                       <Check className="w-3.5 h-3.5 text-white" />
                     </div>
                   )}
                 </div>
 
-                <div className="p-3 space-y-3 bg-violet-50/50">
-                  {/* IDLE */}
-                  {pikaState === "idle" && (
-                    <button onClick={generateWithPika}
-                      className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
-                      <Wand2 className="w-4 h-4" /> Generate AI Video
-                    </button>
-                  )}
+                <div className="p-3 space-y-3 bg-emerald-50/40 dark:bg-emerald-950/10">
 
-                  {/* STARTING */}
-                  {pikaState === "starting" && (
-                    <div className="flex items-center gap-2 text-violet-700 text-sm font-medium py-1">
-                      <Loader2 className="w-4 h-4 animate-spin" /> Connecting to fal.ai…
+                  {/* IDLE */}
+                  {recordState === "idle" && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Renders your animated template ({totalSec}s) into a shareable video file.
+                      </p>
+                      <button onClick={startRecording}
+                        className="w-full py-2.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-600 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-md active:scale-95 transition-transform">
+                        <Circle className="w-4 h-4 fill-white" /> Start Recording
+                      </button>
                     </div>
                   )}
 
-                  {/* POLLING */}
-                  {pikaState === "polling" && (
+                  {/* RECORDING */}
+                  {recordState === "recording" && (
                     <div className="space-y-2.5">
-                      <div className="flex items-center justify-between text-xs font-medium text-violet-700">
+                      <div className="flex items-center justify-between text-xs font-medium text-emerald-700">
                         <span className="flex items-center gap-1.5">
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          AI is generating your video…
+                          <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+                          Recording canvas frames…
                         </span>
-                        <span>{pikaEta > 0 ? `~${pikaEta}s` : "Almost done…"}</span>
+                        <span>{Math.round(recordProgress * 100)}%</span>
                       </div>
-                      <div className="h-2 bg-violet-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full transition-all duration-700"
-                          style={{ width: `${pikaProgress}%` }} />
+                      <div className="h-2 bg-emerald-100 rounded-full overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-300"
+                          style={{ width: `${recordProgress * 100}%` }} />
                       </div>
-                      <p className="text-[11px] text-violet-500 text-center">
-                        Typically takes 30–90 seconds. Please wait…
+                      <p className="text-[11px] text-emerald-600 text-center">
+                        Recording {totalSec}s of animation at 30 fps…
                       </p>
                     </div>
                   )}
 
+                  {/* UPLOADING */}
+                  {recordState === "uploading" && (
+                    <div className="flex items-center gap-2 text-emerald-700 text-sm font-medium py-1">
+                      <Loader2 className="w-4 h-4 animate-spin" /> Saving video to server…
+                    </div>
+                  )}
+
                   {/* DONE */}
-                  {pikaState === "done" && pikaVideoUrl && (
+                  {recordState === "done" && canvasVideoUrl && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-2 text-green-700 text-sm font-bold">
-                        <Check className="w-4 h-4" /> AI video generated! 🎉
+                        <Check className="w-4 h-4" /> Reel recorded! 🎉
                       </div>
                       <video
-                        src={pikaVideoUrl}
+                        src={canvasVideoUrl}
                         controls playsInline
                         className="w-full rounded-xl max-h-56 bg-black object-contain"
                       />
-                      <div className="flex items-center gap-2">
-                        <a href={pikaVideoUrl} target="_blank" rel="noopener noreferrer"
-                          className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a href={canvasVideoUrl} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium hover:underline">
                           <ExternalLink className="w-3.5 h-3.5" /> Open full video
                         </a>
                         <span className="text-muted-foreground/40">·</span>
-                        <button onClick={() => { setPikaState("idle"); setPikaVideoUrl(""); setPikaProgress(0); }}
+                        <button onClick={downloadVideo}
+                          className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium hover:underline">
+                          <Download className="w-3.5 h-3.5" /> Download
+                        </button>
+                        <span className="text-muted-foreground/40">·</span>
+                        <button onClick={resetRecording}
                           className="text-xs text-muted-foreground hover:text-foreground">
-                          Regenerate
+                          Re-record
                         </button>
                       </div>
                     </div>
                   )}
 
                   {/* FAILED */}
-                  {pikaState === "failed" && (
+                  {recordState === "failed" && (
                     <div className="space-y-2">
                       <p className="text-xs text-red-600 font-medium">
-                        Generation failed — server tried all available models.
+                        Recording or upload failed — please try again.
                       </p>
-                      <button onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
-                        className="flex items-center gap-1.5 text-xs text-violet-600 font-medium hover:underline">
+                      <button onClick={resetRecording}
+                        className="flex items-center gap-1.5 text-xs text-emerald-600 font-medium hover:underline">
                         <RefreshCcw className="w-3.5 h-3.5" /> Try again
-                      </button>
-                    </div>
-                  )}
-
-                  {/* BILLING ERROR */}
-                  {pikaState === "billing" && (
-                    <div className="space-y-3">
-                      <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                        <span className="text-xl shrink-0">💳</span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold text-amber-800 mb-0.5">
-                            fal.ai account has no credits
-                          </p>
-                          <p className="text-xs text-amber-700 leading-relaxed">
-                            Your fal.ai account balance is exhausted. Top up to generate AI videos.
-                          </p>
-                        </div>
-                      </div>
-                      <a
-                        href="https://fal.ai/dashboard/billing"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-semibold text-sm active:scale-95 transition-all"
-                      >
-                        <ExternalLink className="w-4 h-4" /> Top Up at fal.ai/dashboard/billing
-                      </a>
-                      <button
-                        onClick={() => { setPikaState("idle"); setPikaProgress(0); setError(""); }}
-                        className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl border border-violet-200 text-violet-600 font-medium text-xs hover:bg-violet-50 transition-colors"
-                      >
-                        <RefreshCcw className="w-3.5 h-3.5" /> Try again after topping up
                       </button>
                     </div>
                   )}
@@ -765,12 +723,12 @@ export default function ReelsStudioPage() {
               {/* Publish readiness indicator */}
               {!canPublish && (
                 <p className="text-center text-xs text-muted-foreground">
-                  Generate an AI video above to unlock "Publish to Feed"
+                  Record your reel above to unlock "Publish to Feed"
                 </p>
               )}
               {canPublish && (
                 <p className="text-center text-xs text-primary font-semibold">
-                  ✅ AI video ready — tap Publish to Feed!
+                  ✅ Reel recorded — tap Publish to Feed!
                 </p>
               )}
 
@@ -796,14 +754,18 @@ export default function ReelsStudioPage() {
                 </p>
               </motion.div>
 
-              {/* AI video if generated */}
-              {pikaVideoUrl && (
+              {/* Recorded video if available */}
+              {canvasVideoUrl && (
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                    <Video className="w-3.5 h-3.5" /> Your AI Video
+                    <Video className="w-3.5 h-3.5" /> Your Reel Video
                   </p>
-                  <video src={pikaVideoUrl} controls playsInline
+                  <video src={canvasVideoUrl} controls playsInline
                     className="w-full rounded-2xl max-h-64 bg-black object-contain shadow-lg" />
+                  <button onClick={downloadVideo}
+                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-border text-foreground font-medium text-sm active:scale-95 transition-transform">
+                    <Download className="w-4 h-4" /> Download Video
+                  </button>
                 </div>
               )}
 
@@ -817,7 +779,7 @@ export default function ReelsStudioPage() {
                 </div>
               </div>
 
-              {/* Share links — open the AI video directly */}
+              {/* Share links — open the video directly */}
               <div className="space-y-2">
                 {[
                   { label: "Share to Instagram", emoji: "📸", color: "from-pink-500 to-purple-600", hint: "Open video · save · upload to Instagram Reels" },
@@ -825,8 +787,8 @@ export default function ReelsStudioPage() {
                   { label: "Share to YouTube",   emoji: "▶️", color: "from-red-500 to-red-600",    hint: "Open video · save · upload to YouTube Shorts" },
                 ].map(s => (
                   <button key={s.label}
-                    onClick={() => pikaVideoUrl && window.open(pikaVideoUrl, "_blank")}
-                    disabled={!pikaVideoUrl}
+                    onClick={() => canvasVideoUrl && window.open(canvasVideoUrl, "_blank")}
+                    disabled={!canvasVideoUrl}
                     className={`w-full flex items-center gap-3 p-3.5 rounded-xl bg-gradient-to-r ${s.color} text-white font-semibold text-sm active:scale-95 transition-transform disabled:opacity-40`}>
                     <span className="text-xl">{s.emoji}</span>
                     <div className="text-left">
