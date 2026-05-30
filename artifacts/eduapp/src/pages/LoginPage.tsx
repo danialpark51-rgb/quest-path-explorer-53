@@ -34,6 +34,7 @@ const LoginPage = () => {
       lastLoginDate: todayStr,
       completedTasks: [],
       completedLessons: [],
+      analyzedThinkers: [],
     });
     navigate("/goals");
   };
