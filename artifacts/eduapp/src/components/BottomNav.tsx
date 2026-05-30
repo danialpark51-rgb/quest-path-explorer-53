@@ -1,19 +1,19 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BookOpen, Trophy, Medal, Film, UserCircle2 } from "lucide-react";
+import { Home, BookOpen, Trophy, Film, PlaySquare, UserCircle2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 
 const BottomNav = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate  = useNavigate();
+  const location  = useLocation();
   const { t } = useLanguage();
 
   const tabs = [
-    { path: "/home",        icon: Home,        label: t("nav.home") },
-    { path: "/skills",      icon: BookOpen,    label: t("nav.skills") },
-    { path: "/quiz",        icon: Trophy,      label: t("nav.quiz") },
-    { path: "/leaderboard", icon: Medal,       label: t("nav.ranks") },
-    { path: "/reels",       icon: Film,        label: "Reels" },
-    { path: "/profile",     icon: UserCircle2, label: t("nav.profile") },
+    { path: "/home",    icon: Home,        label: t("nav.home") },
+    { path: "/skills",  icon: BookOpen,    label: t("nav.skills") },
+    { path: "/quiz",    icon: Trophy,      label: t("nav.quiz") },
+    { path: "/videos",  icon: PlaySquare,  label: "Videos" },
+    { path: "/reels",   icon: Film,        label: "Reels" },
+    { path: "/profile", icon: UserCircle2, label: t("nav.profile") },
   ];
 
   return (
@@ -25,7 +25,9 @@ const BottomNav = () => {
             <button
               key={tab.path}
               onClick={() => navigate(tab.path)}
-              className={`flex flex-col items-center gap-0.5 p-2 rounded-lg transition ${active ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+              className={`flex flex-col items-center gap-0.5 p-2 rounded-lg transition ${
+                active ? "text-primary" : "text-muted-foreground hover:text-foreground"
+              }`}
             >
               <tab.icon className="w-5 h-5" />
               <span className="text-xs font-medium">{tab.label}</span>

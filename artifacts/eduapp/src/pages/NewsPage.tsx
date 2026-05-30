@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { newsItems as staticNews, type NewsItem } from "@/data/news";
 import { useNavigate } from "react-router-dom";
 import { useLanguage } from "@/context/LanguageContext";
+import { useUser } from "@/context/UserContext";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, ChevronRight, X, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
@@ -10,6 +11,8 @@ type ApiArticle = NewsItem & { source?: string; link?: string | null };
 
 const NewsPage = () => {
   const navigate = useNavigate();
+  const { user }  = useUser();
+  const { language } = useLanguage();
   const [filter, setFilter] = useState("All");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [liveNews, setLiveNews] = useState<ApiArticle[]>([]);
@@ -21,7 +24,9 @@ const NewsPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/news");
+      const goal = user?.selectedGoal ?? "default";
+      const params = new URLSearchParams({ goal, language });
+      const res = await fetch(`/api/news?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json() as { articles: ApiArticle[]; fetchedAt?: string; error?: string };
       if (data.error) throw new Error(data.error);
@@ -41,7 +46,8 @@ const NewsPage = () => {
 
   useEffect(() => {
     fetchNews();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.selectedGoal, language]);
 
   const allNews: ApiArticle[] = liveNews.length > 0 ? liveNews : (staticNews as ApiArticle[]);
   const categories = ["All", ...Array.from(new Set(allNews.map((n) => n.category)))];

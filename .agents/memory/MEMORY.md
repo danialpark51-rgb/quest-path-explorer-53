@@ -1,1 +1,3 @@
-- [Pika API integration](pika-api.md) — dual-endpoint strategy for video generation; key is stored as PIKA_API_KEY secret.
+- [Hailuo video generation](hailuo-api.md) — APIMALL Hailuo replaces fal.ai; key stored as APIMALL_AI; endpoints kept as pika-generate/pika-status for frontend compat.
+- [News API keys](news-api-keys.md) — User's news keys (NEWSDATA_API_KEY + NEWSDATA_API_KEY_2) are NewsAPI.org keys, NOT NewsData.io. Route must use newsapi.org/v2/everything.
+- [Chat provider priority](chat-providers.md) — Provider cascade: ReplitAI → Groq (GROQ_API_KEY, llama-3.1-8b-instant) → OpenAI/OpenRouter (OPENAI_API_KEY) → Gemini.
