@@ -10,6 +10,7 @@ import commentsRouter from "./comments";
 import problemFinderRouter from "./problemfinder";
 import thinkingRouter from "./thinking";
 import reelsRouter from "./reels";
+import studyPlannerRouter from "./studyplanner";
 
 const router: IRouter = Router();
 
@@ -24,5 +25,6 @@ router.use(commentsRouter);
 router.use(problemFinderRouter);
 router.use(thinkingRouter);
 router.use(reelsRouter);
+router.use(studyPlannerRouter);
 
 export default router;

@@ -295,34 +295,34 @@ export const REEL_TEMPLATES: ReelTemplate[] = [
 // ─── Music Tracks — free Mixkit CDN previews (no attribution required) ──────
 export const MUSIC_TRACKS: MusicTrack[] = [
   {
-    id: "motivation", name: "Motivational Beat", artist: "Mixkit", duration: "0:30",
+    id: "motivation", name: "Motivational Beat", artist: "SoundHelix", duration: "5:00",
     genre: "Electronic", emoji: "🔥",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-driving-ambition-32.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
   },
   {
-    id: "lofi", name: "Study Vibes", artist: "Mixkit", duration: "0:45",
+    id: "lofi", name: "Study Vibes", artist: "SoundHelix", duration: "5:00",
     genre: "Lo-Fi Chill", emoji: "📚",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-valley-sunset-127.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3",
   },
   {
-    id: "celebration", name: "Achievement Unlocked", artist: "Mixkit", duration: "0:25",
+    id: "celebration", name: "Achievement Unlocked", artist: "SoundHelix", duration: "5:00",
     genre: "Pop", emoji: "🏆",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-games-worldbeat-466.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
   },
   {
-    id: "hustle", name: "Daily Hustle", artist: "Mixkit", duration: "0:35",
+    id: "hustle", name: "Daily Hustle", artist: "SoundHelix", duration: "5:00",
     genre: "Hip Hop", emoji: "💪",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-hip-hop-02-738.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3",
   },
   {
-    id: "dream", name: "Dream Big", artist: "Mixkit", duration: "0:40",
+    id: "dream", name: "Dream Big", artist: "SoundHelix", duration: "5:00",
     genre: "Cinematic", emoji: "✨",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-sleek-and-slick-1000.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3",
   },
   {
-    id: "future", name: "Future Stars", artist: "Mixkit", duration: "0:30",
+    id: "future", name: "Future Stars", artist: "SoundHelix", duration: "5:00",
     genre: "Ambient", emoji: "⭐",
-    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-serene-view-443.mp3",
+    audioUrl: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-11.mp3",
   },
 ];
 

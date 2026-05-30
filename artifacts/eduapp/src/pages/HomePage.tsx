@@ -11,7 +11,7 @@ import { getDailyTaskResource } from "@/data/videoRecommendations";
 import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
-  Gamepad2, Eye, Globe, UserCircle2, Lightbulb, Zap,
+  Gamepad2, Eye, Globe, UserCircle2, Lightbulb, Zap, CalendarDays,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -233,6 +233,16 @@ const HomePage = () => {
             <Trophy className="w-6 h-6 text-yellow-500" />
             <span className="text-sm font-semibold text-foreground">{t("lb.title")}</span>
             <span className="text-xs text-muted-foreground">{t("lb.subtitle")}</span>
+          </button>
+          <button onClick={() => navigate("/study-planner")} className="col-span-2 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/40 dark:to-purple-950/40 border border-violet-200 dark:border-violet-800 rounded-xl p-4 flex items-center gap-4 hover:shadow-card transition">
+            <div className="w-10 h-10 rounded-2xl bg-violet-100 dark:bg-violet-900/50 flex items-center justify-center flex-shrink-0">
+              <CalendarDays className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-foreground">AI Study Planner</p>
+              <p className="text-xs text-muted-foreground">Get a personalised week-by-week schedule</p>
+            </div>
+            <div className="ml-auto text-violet-400 text-lg">→</div>
           </button>
           <button onClick={() => navigate("/problem-finder")} className="col-span-2 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-card transition">
             <div className="w-10 h-10 rounded-2xl bg-orange-100 flex items-center justify-center flex-shrink-0">

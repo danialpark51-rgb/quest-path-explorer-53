@@ -26,6 +26,7 @@ import ThinkingPage from "./pages/ThinkingPage";
 import ReelsFeedPage from "./pages/ReelsFeedPage";
 import ReelsStudioPage from "./pages/ReelsStudioPage";
 import VideosPage from "./pages/VideosPage";
+import StudyPlannerPage from "./pages/StudyPlannerPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -64,6 +65,7 @@ const AppRoutes = () => {
       <Route path="/reels" element={<ProtectedRoute><ReelsFeedPage /></ProtectedRoute>} />
       <Route path="/reels/studio" element={<ProtectedRoute><ReelsStudioPage /></ProtectedRoute>} />
       <Route path="/videos" element={<ProtectedRoute><VideosPage /></ProtectedRoute>} />
+      <Route path="/study-planner" element={<ProtectedRoute><StudyPlannerPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

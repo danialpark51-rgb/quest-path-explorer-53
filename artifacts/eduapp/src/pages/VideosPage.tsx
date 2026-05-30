@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, PlayCircle, X, Globe, ChevronDown,
-  BookOpen, Loader2, Wifi, WifiOff,
+  BookOpen, Loader2, Wifi, WifiOff, ExternalLink,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useUser } from "@/context/UserContext";
@@ -79,7 +79,7 @@ function PlayerModal({ video, onClose }: { video: VideoItem; onClose: () => void
           </button>
 
           {/* 16:9 embed */}
-          <div className="relative w-full" style={{ paddingBottom: "56.25%" }}>
+          <div className="relative w-full bg-black" style={{ paddingBottom: "56.25%" }}>
             <iframe
               className="absolute inset-0 w-full h-full"
               src={`https://www.youtube.com/embed/${video.id}?autoplay=1&rel=0`}
@@ -92,6 +92,15 @@ function PlayerModal({ video, onClose }: { video: VideoItem; onClose: () => void
           <div className="p-4">
             <h3 className="font-bold text-sm leading-snug line-clamp-2">{video.title}</h3>
             <p className="text-xs text-muted-foreground mt-1">{video.channel} · {video.duration}</p>
+            <a
+              href={`https://www.youtube.com/watch?v=${video.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold transition-colors"
+            >
+              <ExternalLink className="w-4 h-4" />
+              Watch on YouTube
+            </a>
           </div>
         </motion.div>
       </motion.div>
