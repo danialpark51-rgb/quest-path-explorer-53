@@ -335,6 +335,7 @@ router.get("/reels", async (req, res) => {
         id: reelsTable.id, reelId: reelsTable.reelId,
         username: reelsTable.username, fullName: reelsTable.fullName,
         title: reelsTable.title, templateId: reelsTable.templateId,
+        scenesJson: reelsTable.scenesJson,
         thumbnailData: reelsTable.thumbnailData,
         hashtags: reelsTable.hashtags, musicTrack: reelsTable.musicTrack,
         goal: reelsTable.goal, contentType: reelsTable.contentType,
@@ -382,11 +383,15 @@ router.get("/reels/leaderboard", async (_req, res) => {
   try {
     const rows = await db
       .select({
-        reelId: reelsTable.reelId, username: reelsTable.username,
-        fullName: reelsTable.fullName, title: reelsTable.title,
-        templateId: reelsTable.templateId, thumbnailData: reelsTable.thumbnailData,
+        id: reelsTable.id, reelId: reelsTable.reelId,
+        username: reelsTable.username, fullName: reelsTable.fullName,
+        title: reelsTable.title, templateId: reelsTable.templateId,
+        scenesJson: reelsTable.scenesJson,
+        thumbnailData: reelsTable.thumbnailData,
+        hashtags: reelsTable.hashtags, musicTrack: reelsTable.musicTrack,
+        goal: reelsTable.goal, contentType: reelsTable.contentType,
         likes: reelsTable.likes, views: reelsTable.views,
-        hashtags: reelsTable.hashtags, videoUrl: reelsTable.videoUrl,
+        videoUrl: reelsTable.videoUrl,
         remixedFrom: reelsTable.remixedFrom, remixedFromUser: reelsTable.remixedFromUser,
         createdAt: reelsTable.createdAt,
       })

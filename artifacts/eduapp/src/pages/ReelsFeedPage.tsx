@@ -2,6 +2,7 @@
  * Skill Reels Feed — Social reel discovery page
  *
  * Features:
+ *  - Full-screen animated canvas reel player (plays directly from scene data — no video file needed)
  *  - Public reel feed (newest first)
  *  - Like / comment on reels
  *  - Trending hashtags (AI-powered, goal-aware)
@@ -16,11 +17,13 @@ import {
   Heart, MessageSquare, Send, X, Plus, Trophy,
   Loader2, Film, Sparkles, ArrowLeft, Trash2,
   TrendingUp, ChevronDown, ChevronUp, RefreshCcw,
+  Play, Music2,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
-import { REEL_TEMPLATES, getTrendingHashtags } from "@/data/reelTemplates";
-import type { ContentType } from "@/data/reelTemplates";
+import ReelRenderer from "@/components/ReelRenderer";
+import { REEL_TEMPLATES, MUSIC_TRACKS, getTrendingHashtags } from "@/data/reelTemplates";
+import type { ContentType, ReelScene } from "@/data/reelTemplates";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -31,8 +34,10 @@ type ReelCard = {
   fullName: string;
   title: string;
   templateId: string;
+  scenesJson: string | null;
   thumbnailData: string | null;
   hashtags: string;
+  musicTrack: string;
   goal: string;
   contentType: string;
   likes: number;
@@ -67,24 +72,166 @@ function timeAgo(iso: string): string {
   return `${Math.floor(h / 24)}d ago`;
 }
 
+function parseScenes(scenesJson: string | null): ReelScene[] {
+  if (!scenesJson) return [];
+  try {
+    const parsed = JSON.parse(scenesJson) as ReelScene[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return [];
+    return parsed;
+  } catch {
+    return [];
+  }
+}
+
+// ─── Full-screen reel player ──────────────────────────────────────────────────
+
+interface ReelPlayerProps {
+  reel: ReelCard;
+  onClose: () => void;
+  isLiked: boolean;
+  onLike: () => void;
+  onRemix: () => void;
+}
+
+function ReelPlayer({ reel, onClose, isLiked, onLike, onRemix }: ReelPlayerProps) {
+  const tpl    = REEL_TEMPLATES.find(t => t.id === reel.templateId) ?? REEL_TEMPLATES[0];
+  const scenes = parseScenes(reel.scenesJson);
+  const tags   = reel.hashtags?.split(",").filter(Boolean) ?? [];
+
+  // Find music track info
+  const musicId    = reel.musicTrack ?? "";
+  const isCustom   = musicId.startsWith("custom:");
+  const customName = isCustom ? musicId.replace("custom:", "") : "";
+  const preset     = !isCustom ? MUSIC_TRACKS.find(m => m.id === musicId) : null;
+
+  // Fallback scenes so the canvas always renders something
+  const renderScenes: ReelScene[] = scenes.length > 0 ? scenes : [
+    { id: "s1", text: reel.title || "My Reel", subtext: reel.goal || "", duration: 3000 },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center"
+    >
+      {/* Close button */}
+      <button
+        onClick={onClose}
+        className="absolute top-4 right-4 z-10 w-9 h-9 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center text-white hover:bg-white/25 active:scale-90 transition-all"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
+      {/* Author info strip */}
+      <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
+        <div className="w-9 h-9 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center font-bold text-white text-sm shrink-0">
+          {reel.fullName?.[0]?.toUpperCase() ?? reel.username?.[0]?.toUpperCase() ?? "?"}
+        </div>
+        <div>
+          <p className="text-white font-semibold text-sm drop-shadow">{reel.fullName}</p>
+          <p className="text-white/70 text-xs drop-shadow">@{reel.username}</p>
+        </div>
+      </div>
+
+      {/* Animated canvas reel */}
+      <div className="flex items-center justify-center w-full h-full px-4">
+        {scenes.length > 0 || reel.title ? (
+          <ReelRenderer
+            scenes={renderScenes}
+            template={tpl}
+            displayWidth={Math.min(300, window.innerWidth - 32)}
+          />
+        ) : (
+          <div
+            className="w-64 h-[455px] rounded-2xl flex flex-col items-center justify-center gap-3 shadow-2xl"
+            style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}
+          >
+            <span className="text-5xl">{tpl.emoji}</span>
+            <p className="text-white font-bold text-center px-4">{reel.title}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Right-side actions */}
+      <div className="absolute right-3 bottom-36 flex flex-col items-center gap-5">
+        <button
+          onClick={onLike}
+          className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
+        >
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm ${
+            isLiked ? "bg-red-500" : "bg-white/20"
+          }`}>
+            <Heart className={`w-5 h-5 ${isLiked ? "fill-white text-white" : "text-white"}`} />
+          </div>
+          <span className="text-white text-xs font-semibold drop-shadow">{reel.likes + (isLiked ? 0 : 0)}</span>
+        </button>
+
+        <button
+          onClick={onRemix}
+          className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
+        >
+          <div className="w-11 h-11 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
+            <RefreshCcw className="w-5 h-5 text-white" />
+          </div>
+          <span className="text-white text-xs font-semibold drop-shadow">Remix</span>
+        </button>
+      </div>
+
+      {/* Bottom info strip */}
+      <div className="absolute bottom-20 left-0 right-0 px-4 space-y-2">
+        <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-3 space-y-1.5">
+          <p className="text-white font-bold text-base drop-shadow leading-snug">{reel.title}</p>
+          {reel.goal && (
+            <p className="text-white/70 text-xs">{reel.goal} Student</p>
+          )}
+          {/* Music info */}
+          <div className="flex items-center gap-1.5">
+            <Music2 className="w-3 h-3 text-white/60 shrink-0" />
+            <span className="text-white/60 text-xs truncate">
+              {isCustom
+                ? `🎵 ${customName || "Custom Upload"}`
+                : preset
+                ? `${preset.emoji} ${preset.name} — ${preset.artist}`
+                : "🎵 No music"}
+            </span>
+          </div>
+          {/* Hashtags */}
+          {tags.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-0.5">
+              {tags.slice(0, 5).map(tag => (
+                <span key={tag} className="text-[10px] text-primary/90 font-medium">{tag}</span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function ReelsFeedPage() {
   const navigate = useNavigate();
   const { user } = useUser();
 
-  const [tab,           setTab]           = useState<"feed" | "leaderboard" | "mine">("feed");
-  const [reels,         setReels]         = useState<ReelCard[]>([]);
-  const [leaderboard,   setLeaderboard]   = useState<ReelCard[]>([]);
-  const [myReels,       setMyReels]       = useState<ReelCard[]>([]);
-  const [trending,      setTrending]      = useState<string[]>([]);
-  const [loading,       setLoading]       = useState(true);
-  const [likedIds,      setLikedIds]      = useState<Set<string>>(new Set());
-  const [expandedReel,  setExpandedReel]  = useState<string | null>(null);
-  const [comments,      setComments]      = useState<Record<string, Comment[]>>({});
-  const [commentInput,  setCommentInput]  = useState("");
-  const [commentingId,  setCommentingId]  = useState<string | null>(null);
-  const [deletingId,    setDeletingId]    = useState<string | null>(null);
+  const [tab,          setTab]          = useState<"feed" | "leaderboard" | "mine">("feed");
+  const [reels,        setReels]        = useState<ReelCard[]>([]);
+  const [leaderboard,  setLeaderboard]  = useState<ReelCard[]>([]);
+  const [myReels,      setMyReels]      = useState<ReelCard[]>([]);
+  const [trending,     setTrending]     = useState<string[]>([]);
+  const [loading,      setLoading]      = useState(true);
+  const [likedIds,     setLikedIds]     = useState<Set<string>>(new Set());
+  const [expandedReel, setExpandedReel] = useState<string | null>(null);
+  const [comments,     setComments]     = useState<Record<string, Comment[]>>({});
+  const [commentInput, setCommentInput] = useState("");
+  const [commentingId, setCommentingId] = useState<string | null>(null);
+  const [deletingId,   setDeletingId]   = useState<string | null>(null);
+
+  // Full-screen player state
+  const [playingReel, setPlayingReel] = useState<ReelCard | null>(null);
 
   // ── Load feed data ────────────────────────────────────────────────────────
   const loadFeed = useCallback(async () => {
@@ -122,7 +269,6 @@ export default function ReelsFeedPage() {
   useEffect(() => {
     loadFeed();
     loadMyReels();
-    // Restore liked IDs from localStorage
     try {
       const saved = JSON.parse(localStorage.getItem("edupath_liked_reels") ?? "[]") as string[];
       setLikedIds(new Set(saved));
@@ -134,7 +280,6 @@ export default function ReelsFeedPage() {
     if (!user) return;
     const wasLiked = likedIds.has(reelId);
 
-    // Optimistic update
     setLikedIds(prev => {
       const next = new Set(prev);
       wasLiked ? next.delete(reelId) : next.add(reelId);
@@ -146,6 +291,9 @@ export default function ReelsFeedPage() {
     setReels(updateCount);
     setLeaderboard(updateCount);
     setMyReels(updateCount);
+    if (playingReel?.reelId === reelId) {
+      setPlayingReel(prev => prev ? { ...prev, likes: prev.likes + (wasLiked ? -1 : 1) } : null);
+    }
 
     await API(`/reels/${reelId}/like`, {
       method: "POST",
@@ -290,6 +438,7 @@ export default function ReelsFeedPage() {
               comments={comments[reel.reelId] ?? []}
               commentInput={commentingId === reel.reelId ? commentInput : ""}
               isDeleting={deletingId === reel.reelId}
+              onPlay={() => { setPlayingReel(reel); markView(reel.reelId); }}
               onLike={() => handleLike(reel.reelId)}
               onToggleComments={() => toggleComments(reel.reelId)}
               onCommentChange={v => { setCommentingId(reel.reelId); setCommentInput(v); }}
@@ -303,6 +452,24 @@ export default function ReelsFeedPage() {
           ))}
         </div>
       )}
+
+      {/* Full-screen reel player */}
+      <AnimatePresence>
+        {playingReel && (
+          <ReelPlayer
+            reel={playingReel}
+            isLiked={likedIds.has(playingReel.reelId)}
+            onClose={() => setPlayingReel(null)}
+            onLike={() => handleLike(playingReel.reelId)}
+            onRemix={() => {
+              setPlayingReel(null);
+              navigate(
+                `/reels/studio?remixFrom=${playingReel.reelId}&template=${playingReel.templateId}&remixUsername=${encodeURIComponent(playingReel.username)}`
+              );
+            }}
+          />
+        )}
+      </AnimatePresence>
 
       <BottomNav />
     </div>
@@ -320,6 +487,7 @@ interface ReelCardItemProps {
   comments: Comment[];
   commentInput: string;
   isDeleting: boolean;
+  onPlay: () => void;
   onLike: () => void;
   onToggleComments: () => void;
   onCommentChange: (v: string) => void;
@@ -331,15 +499,15 @@ interface ReelCardItemProps {
 
 function ReelCardItem({
   reel, rank, isLiked, isMine, isExpanded, comments,
-  commentInput, isDeleting, onLike, onToggleComments,
+  commentInput, isDeleting, onPlay, onLike, onToggleComments,
   onCommentChange, onCommentSubmit, onDelete, onView, onRemix,
 }: ReelCardItemProps) {
   const { user } = useUser();
   const tpl = REEL_TEMPLATES.find(t => t.id === reel.templateId) ?? REEL_TEMPLATES[0];
   const tags = reel.hashtags?.split(",").filter(Boolean) ?? [];
   const userInitial = user?.fullName?.[0]?.toUpperCase() ?? user?.username?.[0]?.toUpperCase() ?? "?";
+  const hasScenes = parseScenes(reel.scenesJson).length > 0 || reel.title;
 
-  // Fire view once on mount
   const viewedRef = useRef(false);
   useEffect(() => {
     if (!viewedRef.current) { viewedRef.current = true; onView(); }
@@ -353,31 +521,42 @@ function ReelCardItem({
     >
       {/* Card header */}
       <div className="flex items-start gap-3">
-        {/* Thumbnail / gradient preview */}
-        <div
-          className="w-16 h-24 rounded-xl shrink-0 overflow-hidden flex items-center justify-center relative"
-          style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}
-        >
-          {reel.thumbnailData ? (
-            <img
-              src={reel.thumbnailData}
-              alt="Reel thumbnail"
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <span className="text-3xl">{
-              REEL_TEMPLATES.find(t => t.id === reel.templateId)?.emoji ?? "🎬"
-            }</span>
-          )}
-          {/* Duration badge */}
-          <div className="absolute bottom-1 left-1 right-1 text-center">
-            <span className="text-white text-[9px] font-bold drop-shadow-md">REEL</span>
-          </div>
-          {rank && (
-            <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-yellow-400 text-yellow-900 text-xs font-bold flex items-center justify-center shadow-md">
-              {rank}
+        {/* Thumbnail / Play button */}
+        <div className="relative shrink-0">
+          <div
+            className="w-16 h-24 rounded-xl overflow-hidden flex items-center justify-center relative cursor-pointer group"
+            style={{ background: `linear-gradient(135deg, ${tpl.gradient[0]}, ${tpl.gradient[1]})` }}
+            onClick={onPlay}
+          >
+            {reel.thumbnailData ? (
+              <img
+                src={reel.thumbnailData}
+                alt="Reel thumbnail"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-3xl">{tpl.emoji}</span>
+            )}
+
+            {/* Play overlay */}
+            {hasScenes && (
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-100 group-hover:opacity-80 transition-opacity rounded-xl">
+                <div className="w-9 h-9 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center shadow-lg">
+                  <Play className="w-4 h-4 text-gray-900 ml-0.5" />
+                </div>
+              </div>
+            )}
+
+            {/* Bottom label */}
+            <div className="absolute bottom-1 left-1 right-1 text-center">
+              <span className="text-white text-[9px] font-bold drop-shadow-md">REEL</span>
             </div>
-          )}
+            {rank && (
+              <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-yellow-400 text-yellow-900 text-xs font-bold flex items-center justify-center shadow-md">
+                {rank}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Info */}
@@ -409,9 +588,6 @@ function ReelCardItem({
             {reel.goal && (
               <span className="text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded-full">{reel.goal}</span>
             )}
-            {reel.videoUrl && (
-              <span className="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-medium">🎬 AI Video</span>
-            )}
           </div>
 
           {/* Remix badge */}
@@ -433,8 +609,22 @@ function ReelCardItem({
         </div>
       </div>
 
-      {/* AI / canvas video player */}
-      {reel.videoUrl && <ReelVideoPlayer url={reel.videoUrl} />}
+      {/* Play prompt banner (always visible if there's content to play) */}
+      {hasScenes && (
+        <button
+          onClick={onPlay}
+          className="w-full flex items-center gap-2.5 py-2.5 px-3 rounded-xl bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 hover:from-primary/15 hover:to-primary/10 transition-colors active:scale-[0.98]"
+        >
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0 shadow-sm">
+            <Play className="w-4 h-4 text-white ml-0.5" />
+          </div>
+          <div className="text-left">
+            <p className="text-xs font-semibold text-foreground">Watch This Reel</p>
+            <p className="text-[10px] text-muted-foreground">Tap to play animated reel · {parseScenes(reel.scenesJson).length || 1} scenes</p>
+          </div>
+          <Film className="w-4 h-4 text-primary ml-auto shrink-0" />
+        </button>
+      )}
 
       {/* Action bar */}
       <div className="flex items-center gap-4 pt-1">
@@ -465,7 +655,7 @@ function ReelCardItem({
         <span className="ml-auto text-xs text-muted-foreground/60">{reel.views} views</span>
       </div>
 
-      {/* Expandable comments section */}
+      {/* Expandable comments */}
       <AnimatePresence>
         {isExpanded && (
           <motion.div
@@ -476,7 +666,6 @@ function ReelCardItem({
             className="overflow-hidden"
           >
             <div className="border-t border-border pt-3 space-y-3">
-              {/* Comment list */}
               {comments.length === 0 ? (
                 <p className="text-xs text-muted-foreground text-center py-2">No comments yet. Be the first!</p>
               ) : (
@@ -494,8 +683,6 @@ function ReelCardItem({
                   ))}
                 </div>
               )}
-
-              {/* Add comment input */}
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-primary/15 flex items-center justify-center text-xs font-bold text-primary shrink-0">
                   {userInitial}
@@ -519,56 +706,6 @@ function ReelCardItem({
         )}
       </AnimatePresence>
     </motion.div>
-  );
-}
-
-// ─── Reel Video Player ────────────────────────────────────────────────────────
-
-function ReelVideoPlayer({ url }: { url: string }) {
-  const [errored, setErrored] = useState(false);
-
-  // Detect MIME type from extension so browsers get a proper hint
-  const mimeType = url.endsWith(".webm")
-    ? "video/webm"
-    : url.endsWith(".mp4")
-    ? "video/mp4"
-    : url.endsWith(".mov")
-    ? "video/quicktime"
-    : "video/mp4"; // safe default for fal.ai output
-
-  if (errored) {
-    return (
-      <div className="rounded-xl bg-black/80 flex flex-col items-center justify-center gap-2 py-6 px-4 text-center">
-        <span className="text-3xl">🎬</span>
-        <p className="text-white/70 text-xs">
-          Video unavailable —{" "}
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline text-white/90"
-          >
-            open directly
-          </a>
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-xl overflow-hidden bg-black">
-      <video
-        controls
-        playsInline
-        preload="metadata"
-        className="w-full max-h-52 object-contain"
-        onError={() => setErrored(true)}
-      >
-        <source src={url} type={mimeType} />
-        {/* Fallback source without explicit type so the browser tries anyway */}
-        <source src={url} />
-      </video>
-    </div>
   );
 }
 
@@ -597,4 +734,3 @@ function EmptyState({ tab, onCreate }: { tab: string; onCreate: () => void }) {
     </div>
   );
 }
-
