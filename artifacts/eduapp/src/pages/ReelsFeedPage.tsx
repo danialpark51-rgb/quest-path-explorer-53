@@ -14,10 +14,10 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Heart, MessageSquare, Send, X, Plus, Trophy,
+  Heart, MessageSquare, Send, X, Plus,
   Loader2, Film, Sparkles, ArrowLeft, Trash2,
   TrendingUp, ChevronDown, ChevronUp, RefreshCcw,
-  Play, Music2,
+  Play, Music2, Volume2, VolumeX, AlertCircle,
 } from "lucide-react";
 import { useUser } from "@/context/UserContext";
 import BottomNav from "@/components/BottomNav";
@@ -98,11 +98,72 @@ function ReelPlayer({ reel, onClose, isLiked, onLike, onRemix }: ReelPlayerProps
   const scenes = parseScenes(reel.scenesJson);
   const tags   = reel.hashtags?.split(",").filter(Boolean) ?? [];
 
-  // Find music track info
+  // ── Audio setup ────────────────────────────────────────────────────────────
+  const audioRef        = useRef<HTMLAudioElement | null>(null);
+  const [muted,         setMuted]         = useState(false);
+  const [audioPlaying,  setAudioPlaying]  = useState(false);
+  const [audioError,    setAudioError]    = useState(false);
+  const [audioReady,    setAudioReady]    = useState(false);
+
   const musicId    = reel.musicTrack ?? "";
   const isCustom   = musicId.startsWith("custom:");
   const customName = isCustom ? musicId.replace("custom:", "") : "";
   const preset     = !isCustom ? MUSIC_TRACKS.find(m => m.id === musicId) : null;
+  const audioUrl   = preset?.audioUrl ?? null;
+
+  // Start audio as soon as component mounts (user tap = interaction = autoplay allowed)
+  useEffect(() => {
+    if (!audioUrl) return;
+
+    const audio        = new Audio(audioUrl);
+    audio.loop         = true;
+    audio.volume       = 0.65;
+    audio.preload      = "auto";
+    audioRef.current   = audio;
+
+    const onCanPlay = () => { setAudioReady(true); };
+    const onPlay    = () => setAudioPlaying(true);
+    const onPause   = () => setAudioPlaying(false);
+    const onError   = () => { setAudioError(true); setAudioPlaying(false); };
+
+    audio.addEventListener("canplay", onCanPlay);
+    audio.addEventListener("play", onPlay);
+    audio.addEventListener("pause", onPause);
+    audio.addEventListener("error", onError);
+
+    // Attempt autoplay — browsers usually allow if triggered from a user gesture
+    audio.play().then(() => {
+      setAudioPlaying(true);
+    }).catch(() => {
+      // Autoplay blocked — user must tap the sound button
+      setAudioReady(true);
+    });
+
+    return () => {
+      audio.removeEventListener("canplay", onCanPlay);
+      audio.removeEventListener("play", onPlay);
+      audio.removeEventListener("pause", onPause);
+      audio.removeEventListener("error", onError);
+      audio.pause();
+      audio.src = "";
+    };
+  }, [audioUrl]);
+
+  const toggleMute = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    if (audioError) return;
+
+    if (audioPlaying) {
+      audio.pause();
+      setMuted(true);
+    } else {
+      // Resume / start
+      audio.play().then(() => {
+        setMuted(false);
+      }).catch(() => setAudioError(true));
+    }
+  };
 
   // Fallback scenes so the canvas always renders something
   const renderScenes: ReelScene[] = scenes.length > 0 ? scenes : [
@@ -155,7 +216,33 @@ function ReelPlayer({ reel, onClose, isLiked, onLike, onRemix }: ReelPlayerProps
       </div>
 
       {/* Right-side actions */}
-      <div className="absolute right-3 bottom-36 flex flex-col items-center gap-5">
+      <div className="absolute right-3 bottom-40 flex flex-col items-center gap-5">
+        {/* Sound toggle */}
+        {(audioUrl || isCustom) && (
+          <button
+            onClick={toggleMute}
+            className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
+          >
+            <div className={`w-11 h-11 rounded-full flex items-center justify-center backdrop-blur-sm ${
+              audioError
+                ? "bg-white/10"
+                : audioPlaying
+                ? "bg-green-500/80"
+                : "bg-white/20"
+            }`}>
+              {audioError
+                ? <VolumeX className="w-5 h-5 text-white/50" />
+                : audioPlaying
+                ? <Volume2 className="w-5 h-5 text-white" />
+                : <VolumeX className="w-5 h-5 text-white" />
+              }
+            </div>
+            <span className="text-white text-[10px] font-medium drop-shadow">
+              {audioError ? "No audio" : audioPlaying ? "Sound" : "Tap"}
+            </span>
+          </button>
+        )}
+
         <button
           onClick={onLike}
           className="flex flex-col items-center gap-1 active:scale-90 transition-transform"
@@ -165,7 +252,7 @@ function ReelPlayer({ reel, onClose, isLiked, onLike, onRemix }: ReelPlayerProps
           }`}>
             <Heart className={`w-5 h-5 ${isLiked ? "fill-white text-white" : "text-white"}`} />
           </div>
-          <span className="text-white text-xs font-semibold drop-shadow">{reel.likes + (isLiked ? 0 : 0)}</span>
+          <span className="text-white text-xs font-semibold drop-shadow">{reel.likes}</span>
         </button>
 
         <button
@@ -180,23 +267,41 @@ function ReelPlayer({ reel, onClose, isLiked, onLike, onRemix }: ReelPlayerProps
       </div>
 
       {/* Bottom info strip */}
-      <div className="absolute bottom-20 left-0 right-0 px-4 space-y-2">
-        <div className="bg-black/40 backdrop-blur-sm rounded-2xl p-3 space-y-1.5">
+      <div className="absolute bottom-6 left-0 right-0 px-4 space-y-2">
+        <div className="bg-black/50 backdrop-blur-sm rounded-2xl p-3 space-y-1.5">
           <p className="text-white font-bold text-base drop-shadow leading-snug">{reel.title}</p>
           {reel.goal && (
             <p className="text-white/70 text-xs">{reel.goal} Student</p>
           )}
-          {/* Music info */}
-          <div className="flex items-center gap-1.5">
-            <Music2 className="w-3 h-3 text-white/60 shrink-0" />
-            <span className="text-white/60 text-xs truncate">
+
+          {/* Music info with live indicator */}
+          <div className="flex items-center gap-2">
+            {audioPlaying ? (
+              <div className="flex items-center gap-1 shrink-0">
+                {[1,2,3].map(b => (
+                  <div key={b}
+                    className="w-0.5 bg-green-400 rounded-full animate-bounce"
+                    style={{ height: `${8 + b * 3}px`, animationDelay: `${b * 0.15}s` }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <Music2 className="w-3 h-3 text-white/60 shrink-0" />
+            )}
+            <span className="text-white/70 text-xs truncate">
               {isCustom
-                ? `🎵 ${customName || "Custom Upload"}`
+                ? `🎵 ${customName || "Your Upload"} · plays in Studio`
+                : audioError
+                ? "Music unavailable"
                 : preset
-                ? `${preset.emoji} ${preset.name} — ${preset.artist}`
-                : "🎵 No music"}
+                ? `${preset.emoji} ${preset.name}`
+                : "No music selected"}
             </span>
+            {isCustom && (
+              <AlertCircle className="w-3 h-3 text-white/40 shrink-0" />
+            )}
           </div>
+
           {/* Hashtags */}
           {tags.length > 0 && (
             <div className="flex flex-wrap gap-1 mt-0.5">

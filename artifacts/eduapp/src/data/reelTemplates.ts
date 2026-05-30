@@ -30,6 +30,7 @@ export type MusicTrack = {
   duration: string;
   genre: string;
   emoji: string;
+  audioUrl?: string; // free Mixkit CDN preview URL for playback
 };
 
 export type ReelScene = {
@@ -291,15 +292,38 @@ export const REEL_TEMPLATES: ReelTemplate[] = [
   },
 ];
 
-// ─── Music Tracks (Placeholder library) ─────────────────────────────────────
-// Plug real audio URLs here when music licensing is in place.
+// ─── Music Tracks — free Mixkit CDN previews (no attribution required) ──────
 export const MUSIC_TRACKS: MusicTrack[] = [
-  { id: "motivation", name: "Motivational Beat",   artist: "EduPath Studio", duration: "0:30", genre: "Electronic",  emoji: "🔥" },
-  { id: "lofi",       name: "Study Vibes",          artist: "EduPath Studio", duration: "0:45", genre: "Lo-Fi Chill", emoji: "📚" },
-  { id: "celebration",name: "Achievement Unlocked", artist: "EduPath Studio", duration: "0:25", genre: "Pop",         emoji: "🏆" },
-  { id: "hustle",     name: "Daily Hustle",          artist: "EduPath Studio", duration: "0:35", genre: "Hip Hop",     emoji: "💪" },
-  { id: "dream",      name: "Dream Big",             artist: "EduPath Studio", duration: "0:40", genre: "Cinematic",   emoji: "✨" },
-  { id: "future",     name: "Future Stars",          artist: "EduPath Studio", duration: "0:30", genre: "Ambient",     emoji: "⭐" },
+  {
+    id: "motivation", name: "Motivational Beat", artist: "Mixkit", duration: "0:30",
+    genre: "Electronic", emoji: "🔥",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-driving-ambition-32.mp3",
+  },
+  {
+    id: "lofi", name: "Study Vibes", artist: "Mixkit", duration: "0:45",
+    genre: "Lo-Fi Chill", emoji: "📚",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-valley-sunset-127.mp3",
+  },
+  {
+    id: "celebration", name: "Achievement Unlocked", artist: "Mixkit", duration: "0:25",
+    genre: "Pop", emoji: "🏆",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-games-worldbeat-466.mp3",
+  },
+  {
+    id: "hustle", name: "Daily Hustle", artist: "Mixkit", duration: "0:35",
+    genre: "Hip Hop", emoji: "💪",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-hip-hop-02-738.mp3",
+  },
+  {
+    id: "dream", name: "Dream Big", artist: "Mixkit", duration: "0:40",
+    genre: "Cinematic", emoji: "✨",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-sleek-and-slick-1000.mp3",
+  },
+  {
+    id: "future", name: "Future Stars", artist: "Mixkit", duration: "0:30",
+    genre: "Ambient", emoji: "⭐",
+    audioUrl: "https://assets.mixkit.co/music/preview/mixkit-serene-view-443.mp3",
+  },
 ];
 
 // ─── Content Type Definitions ─────────────────────────────────────────────────
