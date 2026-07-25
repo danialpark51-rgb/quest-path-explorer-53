@@ -1,17 +1,19 @@
 import type { ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
-import { Award, BookOpen, School, Target, UserCircle2, Globe } from "lucide-react";
+import { Award, BookOpen, School, Target, UserCircle2, Globe, Moon, Sun } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import SchoolMap from "@/components/SchoolMap";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useUser } from "@/context/UserContext";
 import { useLanguage, Language } from "@/context/LanguageContext";
+import { useTheme } from "@/context/ThemeContext";
 import { goals } from "@/data/goals";
 
 const ProfilePage = () => {
   const navigate = useNavigate();
   const { user } = useUser();
   const { t, language, setLanguage, languageNames } = useLanguage();
+  const { isDark, toggleTheme } = useTheme();
 
   if (!user) return null;
 
@@ -54,8 +56,22 @@ const ProfilePage = () => {
           <InfoCard icon={<School className="h-5 w-5 text-primary" />} label={t("profile.school")} value={user.school || t("profile.not_added")} />
           <InfoCard icon={<BookOpen className="h-5 w-5 text-primary" />} label={t("profile.class")} value={user.classStandard ? `${t("profile.class_prefix")} ${user.classStandard}` : t("profile.not_added")} />
           <InfoCard icon={<UserCircle2 className="h-5 w-5 text-primary" />} label={t("profile.usn")} value={user.usnOrSetsNo || t("profile.not_added")} />
-          <InfoCard icon={<Target className="h-5 w-5 text-primary" />} label={t("profile.goal")} value={currentGoal ? `${currentGoal.emoji} ${currentGoal.title}` : t("profile.no_goal")} />
+          <InfoCard icon={<Target className="h-5 w-5 text-primary" />} label={t("profile.goal")} value={currentGoal ? `${currentGoal.emoji} ${currentGoal.title}` : (user.selectedGoal || t("profile.no_goal"))} />
         </section>
+
+        {/* Custom Goals */}
+        {user.customGoals && user.customGoals.length > 0 && (
+          <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
+            <h2 className="font-display text-lg font-bold text-foreground mb-3">🎯 My Custom Goals</h2>
+            <div className="flex flex-wrap gap-2">
+              {user.customGoals.map((g) => (
+                <span key={g} className="px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm font-medium">
+                  {g}
+                </span>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* School Location Map */}
         {user.school && <SchoolMap schoolName={user.school} />}
@@ -89,6 +105,36 @@ const ProfilePage = () => {
                 {name}
               </button>
             ))}
+          </div>
+        </section>
+
+        {/* Appearance / Dark Mode */}
+        <section className="rounded-2xl border border-border bg-card p-5 shadow-card">
+          <div className="mb-3 flex items-center gap-2">
+            {isDark ? <Moon className="h-5 w-5 text-primary" /> : <Sun className="h-5 w-5 text-primary" />}
+            <h2 className="font-display text-lg font-bold text-foreground">Appearance</h2>
+          </div>
+          <p className="text-xs text-muted-foreground mb-4">Choose your preferred display mode. Your preference is saved automatically.</p>
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-xl">
+            <div className="flex items-center gap-3">
+              {isDark
+                ? <Moon className="w-5 h-5 text-blue-400" />
+                : <Sun className="w-5 h-5 text-yellow-500" />
+              }
+              <div>
+                <p className="font-semibold text-foreground text-sm">{isDark ? "Dark Mode" : "Light Mode"}</p>
+                <p className="text-xs text-muted-foreground">{isDark ? "Easy on eyes in low light" : "Classic bright appearance"}</p>
+              </div>
+            </div>
+            <button
+              onClick={toggleTheme}
+              className={`relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none ${isDark ? "bg-primary" : "bg-muted-foreground/30"}`}
+              aria-label="Toggle dark mode"
+            >
+              <span
+                className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform duration-300 ${isDark ? "translate-x-6" : "translate-x-0"}`}
+              />
+            </button>
           </div>
         </section>
       </div>

@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { UserProvider, useUser } from "@/context/UserContext";
 import { LanguageProvider } from "@/context/LanguageContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import LoginPage from "./pages/LoginPage";
 import GoalSelectionPage from "./pages/GoalSelectionPage";
 import HomePage from "./pages/HomePage";
@@ -42,9 +43,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   const { isLoggedIn, user } = useUser();
 
+  // Determine where to send a logged-in user landing on "/"
+  const homeRedirect = () => {
+    if (!user) return "/";
+    if (!user.hasCompletedOnboarding) return "/discover-goal?onboarding=true";
+    if (!user.selectedGoal) return "/goals";
+    return "/home";
+  };
+
   return (
     <Routes>
-      <Route path="/" element={isLoggedIn ? <Navigate to={user?.selectedGoal ? "/home" : "/goals"} replace /> : <LoginPage />} />
+      <Route
+        path="/"
+        element={
+          isLoggedIn
+            ? <Navigate to={homeRedirect()} replace />
+            : <LoginPage />
+        }
+      />
       <Route path="/goals" element={<ProtectedRoute><GoalSelectionPage /></ProtectedRoute>} />
       <Route path="/home" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
       <Route path="/goal/:goalId" element={<ProtectedRoute><GoalDetailPage /></ProtectedRoute>} />
@@ -81,11 +97,13 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <LanguageProvider>
-          <UserProvider>
-            <AppRoutes />
-          </UserProvider>
-        </LanguageProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <UserProvider>
+              <AppRoutes />
+            </UserProvider>
+          </LanguageProvider>
+        </ThemeProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

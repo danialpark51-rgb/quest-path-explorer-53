@@ -15,6 +15,10 @@ type UserData = {
   completedLessons: string[];
   // Tracks which thinkers the user has already analyzed (prevents XP farming)
   analyzedThinkers: string[];
+  // Onboarding: true once user has completed Discover Your Goal flow
+  hasCompletedOnboarding: boolean;
+  // Custom goals added by user via "+" button
+  customGoals: string[];
 };
 
 type UserContextType = {
@@ -27,6 +31,10 @@ type UserContextType = {
   completeLesson: (lessonId: string) => void;
   // Returns XP earned (25) or 0 if already analyzed
   analyzeThinker: (personName: string) => number;
+  // Mark onboarding complete and optionally set a goal
+  completeOnboarding: (goalId?: string) => void;
+  // Add a custom goal
+  addCustomGoal: (goal: string) => void;
 };
 
 const UserContext = createContext<UserContextType | undefined>(undefined);
@@ -59,6 +67,9 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
       if (!parsed.lastLoginDate) parsed.lastLoginDate = "";
       // Migrate: add analyzedThinkers if missing
       if (!parsed.analyzedThinkers) parsed.analyzedThinkers = [];
+      // Migrate: add onboarding/customGoals if missing
+      if (parsed.hasCompletedOnboarding === undefined) parsed.hasCompletedOnboarding = false;
+      if (!parsed.customGoals) parsed.customGoals = [];
       return parsed;
     } catch {
       return null;
@@ -84,6 +95,24 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
 
   const setUser = (u: UserData | null) => setUserState(u);
   const logout = () => setUserState(null);
+
+  const completeOnboarding = (goalId?: string) => {
+    if (!user) return;
+    const updated = {
+      ...user,
+      hasCompletedOnboarding: true,
+      ...(goalId ? { selectedGoal: goalId } : {}),
+    };
+    setUserState(updated);
+    syncLeaderboard(updated);
+  };
+
+  const addCustomGoal = (goal: string) => {
+    if (!user) return;
+    const trimmed = goal.trim();
+    if (!trimmed || user.customGoals?.includes(trimmed)) return;
+    setUserState({ ...user, customGoals: [...(user.customGoals ?? []), trimmed] });
+  };
 
   const syncLeaderboard = (u: UserData) => {
     fetch("/api/leaderboard/sync", {
@@ -141,7 +170,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <UserContext.Provider value={{ user, setUser, isLoggedIn: !!user, logout, addXP, completeTask, completeLesson, analyzeThinker }}>
+    <UserContext.Provider value={{ user, setUser, isLoggedIn: !!user, logout, addXP, completeTask, completeLesson, analyzeThinker, completeOnboarding, addCustomGoal }}>
       {children}
     </UserContext.Provider>
   );

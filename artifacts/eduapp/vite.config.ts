@@ -7,7 +7,7 @@ import autoprefixer from "autoprefixer";
 
 const port = Number(process.env.PORT ?? "5173");
 const basePath = process.env.BASE_PATH ?? "/";
-const apiPort = Number(process.env.API_PORT ?? "3001");
+const apiPort = Number(process.env.API_PORT ?? "8080");
 
 export default defineConfig({
   base: basePath,

@@ -1,19 +1,18 @@
 /**
- * News Route — powered by NewsAPI.org
+ * News Route — powered by NewsAPI.org (primary) + GNews (secondary)
  *
  * GET /api/news?goal=engineering&language=hi
  *
  * Fetches goal-relevant news for Indian students.
- * Uses NEWSDATA_API_KEY (primary) and NEWSDATA_API_KEY_2 (fallback) —
- * both are NewsAPI.org keys stored under those secret names.
- * Falls back to static bundled news if both API keys fail.
+ * Merges results from both sources and deduplicates by title similarity.
+ * Falls back to static bundled news if all API keys fail.
  */
 
 import { Router, type IRouter } from "express";
 
 const router: IRouter = Router();
 
-// ─── NewsAPI.org article shape ────────────────────────────────────────────────
+// ─── Article shapes ───────────────────────────────────────────────────────────
 
 interface NewsApiArticle {
   source:      { id: string | null; name: string };
@@ -24,6 +23,16 @@ interface NewsApiArticle {
   urlToImage:  string | null;
   publishedAt: string;
   content:     string | null;
+}
+
+interface GNewsArticle {
+  title:       string;
+  description: string;
+  content:     string;
+  url:         string;
+  image:       string | null;
+  publishedAt: string;
+  source:      { name: string; url: string };
 }
 
 // ─── Goal → search keywords ───────────────────────────────────────────────────
@@ -39,7 +48,7 @@ const GOAL_QUERIES: Record<string, string> = {
   default:     "education students India school exam",
 };
 
-// ─── Category inference from article content ──────────────────────────────────
+// ─── Category inference ───────────────────────────────────────────────────────
 
 const CATEGORY_MAP: Array<{ keywords: string[]; label: string; emoji: string }> = [
   { keywords: ["technology", "tech", "ai", "software", "coding", "programming"], label: "Technology",  emoji: "💻" },
@@ -50,6 +59,8 @@ const CATEGORY_MAP: Array<{ keywords: string[]; label: string; emoji: string }> 
   { keywords: ["business", "finance", "economy", "market", "stock"],             label: "Business",    emoji: "💼" },
   { keywords: ["government", "upsc", "defence", "army", "civil", "nda"],         label: "Government",  emoji: "🏛️" },
   { keywords: ["environment", "climate", "nature", "green"],                     label: "Environment", emoji: "🌍" },
+  { keywords: ["scholarship", "fellowship", "grant", "award"],                   label: "Scholarship", emoji: "🎓" },
+  { keywords: ["career", "job", "internship", "placement", "hire"],              label: "Career",      emoji: "💼" },
 ];
 
 function inferCategory(title: string, desc: string): { label: string; emoji: string } {
@@ -60,19 +71,35 @@ function inferCategory(title: string, desc: string): { label: string; emoji: str
   return { label: "General", emoji: "📰" };
 }
 
+// ─── Deduplicate by title similarity ─────────────────────────────────────────
+
+function normaliseTitle(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim().slice(0, 60);
+}
+
+function deduplicateArticles<T extends { title: string }>(articles: T[]): T[] {
+  const seen = new Set<string>();
+  return articles.filter((a) => {
+    const key = normaliseTitle(a.title);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 // ─── Per-(goal+lang) server-side cache ────────────────────────────────────────
 
 const cacheMap = new Map<string, { data: unknown; expiresAt: number }>();
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 min
 
+// ─── Default image ────────────────────────────────────────────────────────────
+
+const DEFAULT_IMG = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400";
+
 // ─── Fetch from NewsAPI.org ────────────────────────────────────────────────────
 
-async function fetchFromNewsApi(
-  apiKey: string,
-  query: string,
-): Promise<NewsApiArticle[] | null> {
+async function fetchFromNewsApi(apiKey: string, query: string): Promise<NewsApiArticle[] | null> {
   try {
-    // Use /v2/everything for keyword-based search targeting Indian education news
     const params = new URLSearchParams({
       q:        query,
       apiKey:   apiKey,
@@ -83,39 +110,117 @@ async function fetchFromNewsApi(
 
     const r = await fetch(
       `https://newsapi.org/v2/everything?${params.toString()}`,
-      {
-        headers: { Accept: "application/json" },
-        signal:  AbortSignal.timeout(12_000),
-      },
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12_000) },
     );
 
     if (!r.ok) {
-      const body = await r.text().catch(() => "");
-      console.warn(`[news] newsapi.org HTTP ${r.status}: ${body.slice(0, 200)}`);
+      console.warn(`[news] newsapi.org HTTP ${r.status}`);
       return null;
     }
 
     const raw = await r.json() as { status: string; articles?: NewsApiArticle[]; message?: string };
+    if (raw.status !== "ok" || !raw.articles) return null;
+    return raw.articles;
+  } catch (e) {
+    console.warn("[news] newsapi.org fetch error:", (e as Error).message);
+    return null;
+  }
+}
 
-    if (raw.status !== "ok" || !raw.articles) {
-      console.warn("[news] newsapi.org non-ok status:", raw.status, raw.message);
+// ─── Fetch from GNews ─────────────────────────────────────────────────────────
+
+async function fetchFromGNews(apiKey: string, query: string): Promise<GNewsArticle[] | null> {
+  try {
+    const params = new URLSearchParams({
+      q:      query,
+      token:  apiKey,
+      lang:   "en",
+      max:    "15",
+      sortby: "publishedAt",
+    });
+
+    const r = await fetch(
+      `https://gnews.io/api/v4/search?${params.toString()}`,
+      { headers: { Accept: "application/json" }, signal: AbortSignal.timeout(12_000) },
+    );
+
+    if (!r.ok) {
+      console.warn(`[news] gnews HTTP ${r.status}`);
       return null;
     }
 
+    const raw = await r.json() as { articles?: GNewsArticle[]; errors?: string[] };
+    if (!raw.articles) return null;
     return raw.articles;
   } catch (e) {
-    console.warn("[news] fetch error:", (e as Error).message);
+    console.warn("[news] gnews fetch error:", (e as Error).message);
     return null;
   }
+}
+
+// ─── Normalise to app shape ───────────────────────────────────────────────────
+
+interface AppArticle {
+  id:       string;
+  title:    string;
+  summary:  string;
+  content:  string;
+  category: string;
+  date:     string;
+  emoji:    string;
+  imageUrl: string;
+  source:   string;
+  link:     string | null;
+}
+
+function fromNewsApi(articles: NewsApiArticle[], ts: number): AppArticle[] {
+  return articles
+    .filter((a) => a.title && a.description && a.title !== "[Removed]")
+    .map((a, idx) => {
+      const { label, emoji } = inferCategory(a.title ?? "", a.description ?? "");
+      return {
+        id:       `newsapi-${idx}-${ts}`,
+        title:    a.title!,
+        summary:  a.description ?? "",
+        content:  a.content ?? a.description ?? "",
+        category: label,
+        date:     a.publishedAt ? a.publishedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        emoji,
+        imageUrl: a.urlToImage ?? DEFAULT_IMG,
+        source:   a.source.name,
+        link:     a.url ?? null,
+      };
+    });
+}
+
+function fromGNews(articles: GNewsArticle[], ts: number): AppArticle[] {
+  return articles
+    .filter((a) => a.title && a.description)
+    .map((a, idx) => {
+      const { label, emoji } = inferCategory(a.title, a.description);
+      return {
+        id:       `gnews-${idx}-${ts}`,
+        title:    a.title,
+        summary:  a.description,
+        content:  a.content || a.description,
+        category: label,
+        date:     a.publishedAt ? a.publishedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
+        emoji,
+        imageUrl: a.image ?? DEFAULT_IMG,
+        source:   a.source.name,
+        link:     a.url ?? null,
+      };
+    });
 }
 
 // ─── Route ────────────────────────────────────────────────────────────────────
 
 router.get("/news", async (req, res) => {
-  const primaryKey  = process.env.NEWSDATA_API_KEY;
-  const fallbackKey = process.env.NEWSDATA_API_KEY_2;
+  const primaryKey   = process.env.NEWSDATA_API_KEY;
+  const fallbackKey  = process.env.NEWSDATA_API_KEY_2;
+  const gnewsKey     = process.env.GNEWS_API_KEY;
 
-  if (!primaryKey && !fallbackKey) {
+  if (!primaryKey && !fallbackKey && !gnewsKey) {
     res.status(503).json({ error: "News API not configured", articles: [] });
     return;
   }
@@ -132,45 +237,48 @@ router.get("/news", async (req, res) => {
     return;
   }
 
-  // Try primary key, then fallback
-  let rawArticles: NewsApiArticle[] | null = null;
+  const ts = Date.now();
 
-  if (primaryKey) {
-    rawArticles = await fetchFromNewsApi(primaryKey, query);
-  }
-  if (!rawArticles && fallbackKey) {
-    console.log("[news] primary key failed or missing, trying fallback…");
-    rawArticles = await fetchFromNewsApi(fallbackKey, query);
-  }
+  // Fetch from both sources in parallel
+  const [newsApiRaw, gnewsRaw] = await Promise.all([
+    (async () => {
+      if (primaryKey) {
+        const r = await fetchFromNewsApi(primaryKey, query);
+        if (r) return r;
+      }
+      if (fallbackKey) {
+        console.log("[news] primary key failed or missing, trying fallback…");
+        return fetchFromNewsApi(fallbackKey, query);
+      }
+      return null;
+    })(),
+    gnewsKey ? fetchFromGNews(gnewsKey, query) : Promise.resolve(null),
+  ]);
 
-  if (!rawArticles || rawArticles.length === 0) {
+  // Combine and normalise
+  const newsApiArticles = newsApiRaw ? fromNewsApi(newsApiRaw, ts) : [];
+  const gnewsArticles   = gnewsRaw   ? fromGNews(gnewsRaw, ts)    : [];
+
+  // Merge: newsAPI first, then GNews; deduplicate by title
+  const merged = deduplicateArticles([...newsApiArticles, ...gnewsArticles]);
+
+  if (merged.length === 0) {
     res.status(502).json({ error: "Failed to fetch news from all sources", articles: [] });
     return;
   }
 
-  // Filter out articles without title/description and map to app shape
-  const DEFAULT_IMG = "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=400";
+  const result = {
+    articles:  merged,
+    fetchedAt: new Date().toISOString(),
+    goal,
+    language,
+    sources: [
+      ...(newsApiArticles.length > 0 ? ["NewsAPI"] : []),
+      ...(gnewsArticles.length > 0   ? ["GNews"]   : []),
+    ],
+  };
 
-  const articles = rawArticles
-    .filter((a) => a.title && a.description && a.title !== "[Removed]")
-    .map((a, idx) => {
-      const { label, emoji } = inferCategory(a.title ?? "", a.description ?? "");
-      return {
-        id:       `newsapi-${idx}-${Date.now()}`,
-        title:    a.title!,
-        summary:  a.description ?? "",
-        content:  a.content ?? a.description ?? "",
-        category: label,
-        date:     a.publishedAt ? a.publishedAt.slice(0, 10) : new Date().toISOString().slice(0, 10),
-        emoji,
-        imageUrl: a.urlToImage ?? DEFAULT_IMG,
-        source:   a.source.name,
-        link:     a.url ?? null,
-      };
-    });
-
-  const result = { articles, fetchedAt: new Date().toISOString(), goal, language };
-  cacheMap.set(cacheKey, { data: result, expiresAt: Date.now() + CACHE_TTL_MS });
+  cacheMap.set(cacheKey, { data: result, expiresAt: ts + CACHE_TTL_MS });
   res.json(result);
 });
 
