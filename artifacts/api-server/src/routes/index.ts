@@ -4,13 +4,16 @@ import chatRouter          from "./chat";
 import newsRouter          from "./news";
 import videosRouter        from "./videos";
 import schoolRouter        from "./school";
-import leaderboardRouter from "./leaderboard";
-import projectsRouter from "./projects";
-import commentsRouter from "./comments";
+import leaderboardRouter   from "./leaderboard";
+import projectsRouter      from "./projects";
+import commentsRouter      from "./comments";
 import problemFinderRouter from "./problemfinder";
-import thinkingRouter from "./thinking";
-import reelsRouter from "./reels";
-import studyPlannerRouter from "./studyplanner";
+import thinkingRouter      from "./thinking";
+import studyPlannerRouter  from "./studyplanner";
+import discoverGoalRouter  from "./discover-goal";
+import scholarshipsRouter  from "./scholarships";
+import internshipsRouter   from "./internships";
+import feedbackRouter      from "./feedback";
 
 const router: IRouter = Router();
 
@@ -24,7 +27,10 @@ router.use(projectsRouter);
 router.use(commentsRouter);
 router.use(problemFinderRouter);
 router.use(thinkingRouter);
-router.use(reelsRouter);
 router.use(studyPlannerRouter);
+router.use(discoverGoalRouter);
+router.use(scholarshipsRouter);
+router.use(internshipsRouter);
+router.use(feedbackRouter);
 
 export default router;

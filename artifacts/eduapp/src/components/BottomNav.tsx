@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Home, BookOpen, Trophy, Film, PlaySquare, UserCircle2 } from "lucide-react";
+import { Home, BookOpen, Trophy, PlaySquare, Compass, UserCircle2 } from "lucide-react";
 import { useLanguage } from "@/context/LanguageContext";
 
 const BottomNav = () => {
@@ -8,12 +8,12 @@ const BottomNav = () => {
   const { t } = useLanguage();
 
   const tabs = [
-    { path: "/home",    icon: Home,        label: t("nav.home") },
-    { path: "/skills",  icon: BookOpen,    label: t("nav.skills") },
-    { path: "/quiz",    icon: Trophy,      label: t("nav.quiz") },
-    { path: "/videos",  icon: PlaySquare,  label: "Videos" },
-    { path: "/reels",   icon: Film,        label: "Reels" },
-    { path: "/profile", icon: UserCircle2, label: t("nav.profile") },
+    { path: "/home",          icon: Home,        label: t("nav.home") },
+    { path: "/skills",        icon: BookOpen,    label: t("nav.skills") },
+    { path: "/quiz",          icon: Trophy,      label: t("nav.quiz") },
+    { path: "/videos",        icon: PlaySquare,  label: "Videos" },
+    { path: "/discover-goal", icon: Compass,     label: "Discover" },
+    { path: "/profile",       icon: UserCircle2, label: t("nav.profile") },
   ];
 
   return (

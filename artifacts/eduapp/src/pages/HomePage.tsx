@@ -12,6 +12,7 @@ import {
   Target, Play, Brain, Flame, Trophy, Newspaper,
   Headphones, MessageCircle, LogOut, ChevronRight, Award,
   Gamepad2, Eye, Globe, UserCircle2, Lightbulb, Zap, CalendarDays,
+  Compass, GraduationCap, Briefcase, MessageSquarePlus,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
@@ -253,6 +254,54 @@ const HomePage = () => {
               <p className="text-xs text-muted-foreground">{t("home.pf_sub")}</p>
             </div>
             <div className="ml-auto text-orange-400 text-lg">→</div>
+          </button>
+
+          {/* ── AI Career Discovery ── */}
+          <button onClick={() => navigate("/discover-goal")} className="col-span-2 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl p-4 flex items-center gap-4 hover:opacity-95 transition shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Compass className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-white">Discover Your Goal</p>
+              <p className="text-xs text-white/70">AI finds your perfect career path</p>
+            </div>
+            <div className="ml-auto text-white/70 text-lg">→</div>
+          </button>
+
+          {/* ── Think Like Great Minds ── */}
+          <button onClick={() => navigate("/thinking")} className="col-span-2 bg-gradient-to-r from-purple-600 to-fuchsia-600 rounded-xl p-4 flex items-center gap-4 hover:opacity-95 transition shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <Brain className="w-5 h-5 text-white" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-white">Think Like Great Minds</p>
+              <p className="text-xs text-white/70">Explore Einstein, Tesla, Kalam & more</p>
+            </div>
+            <div className="ml-auto text-white/70 text-lg">→</div>
+          </button>
+
+          {/* ── Scholarships & Internships ── */}
+          <button onClick={() => navigate("/scholarships")} className="bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-200 rounded-xl p-4 flex flex-col items-start gap-2 hover:shadow-card transition">
+            <GraduationCap className="w-6 h-6 text-amber-600" />
+            <p className="text-sm font-bold text-foreground">Scholarships</p>
+            <p className="text-xs text-muted-foreground">AI finds funding for you</p>
+          </button>
+          <button onClick={() => navigate("/internships")} className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-200 rounded-xl p-4 flex flex-col items-start gap-2 hover:shadow-card transition">
+            <Briefcase className="w-6 h-6 text-blue-600" />
+            <p className="text-sm font-bold text-foreground">Internships</p>
+            <p className="text-xs text-muted-foreground">Real experience opportunities</p>
+          </button>
+
+          {/* ── Feedback ── */}
+          <button onClick={() => navigate("/feedback")} className="col-span-2 bg-gradient-to-r from-rose-50 to-pink-50 border border-rose-200 rounded-xl p-4 flex items-center gap-4 hover:shadow-card transition">
+            <div className="w-10 h-10 rounded-2xl bg-rose-100 flex items-center justify-center flex-shrink-0">
+              <MessageSquarePlus className="w-5 h-5 text-rose-500" />
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-foreground">Share Feedback</p>
+              <p className="text-xs text-muted-foreground">Help us improve EduPath for everyone</p>
+            </div>
+            <div className="ml-auto text-rose-400 text-lg">→</div>
           </button>
         </div>
       </div>

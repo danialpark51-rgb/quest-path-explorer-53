@@ -1,0 +1,35 @@
+[
+  {
+    "id": "fb_1784962173554_uvihb",
+    "timestamp": "2026-07-25T06:49:33.554Z",
+    "username": "test",
+    "rating": 5,
+    "category": "general",
+    "message": "Great app! Really useful.",
+    "suggestions": "",
+    "bugReport": "",
+    "featureRequest": ""
+  },
+  {
+    "id": "fb_1784962220650_wogvd",
+    "timestamp": "2026-07-25T06:50:20.650Z",
+    "username": "anonymous",
+    "rating": 3,
+    "category": "general",
+    "message": "This is a proper feedback message for testing",
+    "suggestions": "",
+    "bugReport": "",
+    "featureRequest": ""
+  },
+  {
+    "id": "fb_1784962233036_4ah5u",
+    "timestamp": "2026-07-25T06:50:33.036Z",
+    "username": "anonymous",
+    "rating": 5,
+    "category": "general",
+    "message": "Excellent app, very helpful for students!",
+    "suggestions": "",
+    "bugReport": "",
+    "featureRequest": ""
+  }
+]

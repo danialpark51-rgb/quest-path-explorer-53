@@ -5,7 +5,7 @@ import { useLanguage, Language } from "@/context/LanguageContext";
 import { motion } from "framer-motion";
 import { BookOpen, GraduationCap, User, School, Hash, Globe } from "lucide-react";
 
-const classes = ["6", "7", "8", "9", "10"];
+const classes = ["5", "6", "7", "8", "9", "10", "11", "12"];
 
 const LoginPage = () => {
   const navigate = useNavigate();

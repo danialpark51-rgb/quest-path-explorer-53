@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
 app.use("/api", router);
 
-// ─── Serve uploaded reel videos ───────────────────────────────────────────────
+// ─── Serve uploads directory (feedback, media) ────────────────────────────────
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
 app.use("/uploads", express.static(uploadsDir));

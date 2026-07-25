@@ -44,12 +44,24 @@ A personalized educational learning app that guides students through goal-based 
 
 ## Product
 
-- Login/onboarding with username, name, school, USN, class selection
+- Login/onboarding with username, name, school, USN, class selection (Class 5–12)
 - Goal selection (Engineering, Medical, Commerce, Arts, IT, Defence, Govt)
 - Home dashboard with XP, level, streak
 - Skills, quizzes, stories, news, tasks, games, AI assistant, observations
-- Bottom nav for mobile-first navigation
+- Bottom nav: Home, Skills, Quiz, Videos, Discover, Profile
 - Profile page with progress tracking
+
+### AI Features
+- **Discover Your Goal** (`/discover-goal`) — free-text input → AI returns top 4 career paths with roadmaps, personality profile, salary info, and "explore more" section
+- **Think Like Great Minds** (`/thinking`) — explore famous thinkers' mindsets with TTS in 10 Indian languages; +25 XP per unique thinker
+- **Scholarships** (`/scholarships`) — AI recommends real scholarships based on class, location, skills
+- **Internships** (`/internships`) — AI recommends internship programs and platforms
+
+### Other Features
+- **Feedback** (`/feedback`) — star rating, category, message, bug report, feature request; stored in `uploads/feedback.json` (no DB required)
+
+### Removed
+- ~~Reels~~ — feature removed; all pages, components, data files, API routes, and DB schema deleted
 
 ## User preferences
 
@@ -60,6 +72,9 @@ _Populate as you build — explicit user instructions worth remembering across s
 - Do NOT run `pnpm dev` at workspace root — it has no dev script
 - Tailwind v3 is used (not v4); the config is `tailwind.config.ts` with postcss
 - `@supabase/supabase-js` is installed but unused — safe to remove if cleaning up deps
+- AI features (discover-goal, scholarships, internships, thinking) require at least one AI key: `GROQ_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`, or the Replit AI integration (`AI_INTEGRATIONS_OPENAI_API_KEY`)
+- Feedback is stored in `uploads/feedback.json` (file-based, no DB required)
+- Class range is now 5–12 (updated from 6–10)
 
 ## Pointers
 
