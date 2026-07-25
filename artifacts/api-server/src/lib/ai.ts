@@ -22,10 +22,16 @@ async function tryReplitAI(prompt: string, maxTokens = 4096): Promise<string | n
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      console.warn(`[ai] ReplitAI HTTP ${res.status}`);
+      return null;
+    }
     const data = await res.json() as { choices?: { message?: { content?: string } }[] };
     return data?.choices?.[0]?.message?.content ?? null;
-  } catch { return null; }
+  } catch (e) {
+    console.warn("[ai] ReplitAI error:", (e as Error).message);
+    return null;
+  }
 }
 
 async function tryGroq(prompt: string, maxTokens = 4096): Promise<string | null> {
@@ -43,10 +49,17 @@ async function tryGroq(prompt: string, maxTokens = 4096): Promise<string | null>
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.warn(`[ai] Groq HTTP ${res.status}:`, body.slice(0, 200));
+      return null;
+    }
     const data = await res.json() as { choices?: { message?: { content?: string } }[] };
     return data?.choices?.[0]?.message?.content ?? null;
-  } catch { return null; }
+  } catch (e) {
+    console.warn("[ai] Groq error:", (e as Error).message);
+    return null;
+  }
 }
 
 async function tryOpenAI(prompt: string, maxTokens = 4096): Promise<string | null> {
@@ -67,10 +80,17 @@ async function tryOpenAI(prompt: string, maxTokens = 4096): Promise<string | nul
       }),
       signal: AbortSignal.timeout(30_000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.warn(`[ai] OpenAI HTTP ${res.status}:`, body.slice(0, 200));
+      return null;
+    }
     const data = await res.json() as { choices?: { message?: { content?: string } }[] };
     return data?.choices?.[0]?.message?.content ?? null;
-  } catch { return null; }
+  } catch (e) {
+    console.warn("[ai] OpenAI error:", (e as Error).message);
+    return null;
+  }
 }
 
 async function tryGemini(prompt: string, maxTokens = 4096): Promise<string | null> {
@@ -89,12 +109,23 @@ async function tryGemini(prompt: string, maxTokens = 4096): Promise<string | nul
         signal: AbortSignal.timeout(30_000),
       }
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      if (res.status === 429) {
+        console.warn("[ai] Gemini quota exceeded (429) — check billing at https://ai.dev/rate-limit");
+      } else {
+        console.warn(`[ai] Gemini HTTP ${res.status}:`, body.slice(0, 200));
+      }
+      return null;
+    }
     const data = await res.json() as {
       candidates?: { content?: { parts?: { text?: string }[] } }[];
     };
     return data?.candidates?.[0]?.content?.parts?.[0]?.text ?? null;
-  } catch { return null; }
+  } catch (e) {
+    console.warn("[ai] Gemini error:", (e as Error).message);
+    return null;
+  }
 }
 
 /** Call AI with automatic provider fallback. Returns null if all providers fail. */
