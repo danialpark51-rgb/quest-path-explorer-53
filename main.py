@@ -25,3 +25,13 @@ if response.status_code == 200:
 else:
     print(f"Error: {response.status_code}")
     print(response.text)
+if response.status_code == 200:
+    data = response.json()
+    articles = data.get('articles')
+    for index, article in enumerate(articles, 1):
+        print(f"{index}. {article['title']}")
+        print(f"   Link: {article['url']}\n")
+else:
+    # This will print the exact error message returning from GNews
+    print(f"HTTP Error Status: {response.status_code}")
+    print(f"Server Response: {response.text}") 
