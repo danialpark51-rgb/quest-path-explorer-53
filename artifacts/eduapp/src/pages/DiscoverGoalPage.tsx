@@ -19,7 +19,7 @@ import {
   Compass, ArrowLeft, Sparkles, AlertCircle, RotateCcw,
   ChevronDown, ChevronUp, Star, TrendingUp, BookOpen,
   Target, Zap, BarChart3, DollarSign, Layers,
-  Search, Plus, X, CheckCircle2, SkipForward,
+  Search, Plus, X, CheckCircle2, SkipForward, PlayCircle,
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 import { useUser } from "@/context/UserContext";
@@ -127,6 +127,53 @@ const MatchRing = ({ score }: { score: number }) => {
         {score}%
       </span>
     </div>
+  );
+};
+
+// ─── Career → Goal mapping (for video links) ─────────────────────────────────
+
+function mapCareerToGoal(career: string): string {
+  const c = career.toLowerCase();
+  // Specific career IDs (match backend goal IDs added to videos.ts)
+  if (c.includes("software") || c.includes("full stack") || c.includes("web developer") || c.includes("app developer") || c.includes("programmer") || c.includes("devops") || c.includes("cloud engineer")) return "software-engineer";
+  if (c.includes("ai engineer") || c.includes("ml engineer") || c.includes("machine learn") || c.includes("deep learn") || c.includes("nlp engineer") || c.includes("ai/ml")) return "ai-engineer";
+  if (c.includes("data scien") || c.includes("data analyst")) return "data-scientist";
+  if (c.includes("cybersecurity") || c.includes("cyber security") || c.includes("ethical hack") || c.includes("information security")) return "cybersecurity";
+  if (c.includes("mechanical") || c.includes("production engineer")) return "mechanical";
+  if (c.includes("civil engineer")) return "civil";
+  if (c.includes("chartered accountant") || (c.includes("ca") && c.length <= 10)) return "ca";
+  if (c.includes("digital market") || c.includes("seo specialist") || c.includes("content market")) return "digital-marketing";
+  if (c.includes("entrepreneur") || c.includes("startup founder") || c.includes("business owner")) return "entrepreneur";
+  if (c.includes("graphic design") || c.includes("ui/ux") || c.includes("ui design") || c.includes("ux design") || c.includes("fashion design") || c.includes("interior design") || c.includes("animation")) return "design";
+  if (c.includes("lawyer") || c.includes("advocate") || c.includes("barrister") || c.includes("solicitor")) return "lawyer";
+  if (c.includes("scientist") || c.includes("research scientist") || c.includes("isro") || c.includes("drdo") || c.includes("physicist") || c.includes("chemist") || c.includes("biologist") || c.includes("astronomer")) return "scientist";
+  // Broad category fallbacks
+  if (c.includes("engineer") || c.includes("iit") || c.includes("jee")) return "engineering";
+  if (c.includes("doctor") || c.includes("mbbs") || c.includes("medical") || c.includes("neet") || c.includes("dentist") || c.includes("pharma") || c.includes("nurse")) return "medical";
+  if (c.includes("ias") || c.includes("ips") || c.includes("ifs") || c.includes("upsc") || c.includes("civil serv") || c.includes("government") || c.includes("police") || c.includes("judge")) return "govt";
+  if (c.includes("army") || c.includes("navy") || c.includes("air force") || c.includes("nda") || c.includes("defence") || c.includes("military") || c.includes("pilot")) return "defence";
+  if (c.includes("commerce") || c.includes("accountant") || c.includes("mba") || c.includes("finance") || c.includes("banker") || c.includes("stock") || c.includes("econom")) return "commerce";
+  if (c.includes("artist") || c.includes("painter") || c.includes("musician") || c.includes("actor") || c.includes("film") || c.includes("design") || c.includes("creative") || c.includes("content creator")) return "arts";
+  if (c.includes("research") || c.includes("phd") || c.includes("biotech") || c.includes("biology") || c.includes("chemistry") || c.includes("physics") || c.includes("astronomy")) return "science";
+  return "all";
+}
+
+// ─── Video Link Button ────────────────────────────────────────────────────────
+
+const VideoLink = ({ goalName }: { goalName: string }) => {
+  const navigate = useNavigate();
+  const goal = mapCareerToGoal(goalName);
+  return (
+    <button
+      onClick={(e) => {
+        e.stopPropagation();
+        navigate(`/videos?goal=${goal}`);
+      }}
+      className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white rounded-xl py-2.5 text-sm font-semibold transition"
+    >
+      <PlayCircle className="w-4 h-4" />
+      Watch Relevant Videos
+    </button>
   );
 };
 
@@ -277,6 +324,9 @@ const GoalCard = ({
                   ))}
                 </div>
               </div>
+
+              {/* Watch Videos button — always shown */}
+              <VideoLink goalName={rec.goalName} />
 
               {/* Select button — onboarding only */}
               {isOnboarding && onSelect && (

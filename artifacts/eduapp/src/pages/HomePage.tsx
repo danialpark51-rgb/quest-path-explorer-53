@@ -256,6 +256,18 @@ const HomePage = () => {
             <div className="ml-auto text-orange-400 text-lg">→</div>
           </button>
 
+          {/* ── General Knowledge ── */}
+          <button onClick={() => navigate("/gk")} className="col-span-2 bg-gradient-to-r from-violet-500 to-indigo-600 rounded-xl p-4 flex items-center gap-4 hover:opacity-95 transition shadow-sm">
+            <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
+              <span className="text-xl">📖</span>
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-bold text-white">General Knowledge (GK)</p>
+              <p className="text-xs text-white/70">Lessons, quizzes &amp; search — earn XP</p>
+            </div>
+            <div className="ml-auto text-white/70 text-lg">→</div>
+          </button>
+
           {/* ── AI Career Discovery ── */}
           <button onClick={() => navigate("/discover-goal")} className="col-span-2 bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl p-4 flex items-center gap-4 hover:opacity-95 transition shadow-sm">
             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">

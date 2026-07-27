@@ -30,6 +30,7 @@ import DiscoverGoalPage from "./pages/DiscoverGoalPage";
 import ScholarshipsPage from "./pages/ScholarshipsPage";
 import InternshipsPage from "./pages/InternshipsPage";
 import FeedbackPage from "./pages/FeedbackPage";
+import GKPage from "./pages/GKPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -86,6 +87,7 @@ const AppRoutes = () => {
       <Route path="/scholarships" element={<ProtectedRoute><ScholarshipsPage /></ProtectedRoute>} />
       <Route path="/internships" element={<ProtectedRoute><InternshipsPage /></ProtectedRoute>} />
       <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
+      <Route path="/gk" element={<ProtectedRoute><GKPage /></ProtectedRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

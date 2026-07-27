@@ -37,14 +37,29 @@ type ApiResponse = {
 // ─── Goal metadata ─────────────────────────────────────────────────────────────
 
 const GOAL_LABELS: Record<string, { label: string; emoji: string; color: string }> = {
-  engineering: { label: "Engineering",    emoji: "⚙️",  color: "from-blue-500 to-cyan-500" },
-  medical:     { label: "Medical",        emoji: "🏥",  color: "from-green-500 to-teal-500" },
-  commerce:    { label: "Commerce",       emoji: "💼",  color: "from-yellow-500 to-orange-500" },
-  arts:        { label: "Arts",           emoji: "🎨",  color: "from-purple-500 to-pink-500" },
-  it:          { label: "IT & Coding",    emoji: "💻",  color: "from-indigo-500 to-blue-500" },
-  defence:     { label: "Defence",        emoji: "🎖️",  color: "from-gray-600 to-slate-700" },
-  govt:        { label: "Government",     emoji: "🏛️",  color: "from-orange-500 to-red-500" },
-  all:         { label: "All Topics",     emoji: "📚",  color: "from-violet-500 to-fuchsia-500" },
+  // ── Main career categories shown in the picker ──
+  engineering:        { label: "Engineering",         emoji: "⚙️",  color: "from-blue-500 to-cyan-500" },
+  medical:            { label: "Medical",             emoji: "🏥",  color: "from-green-500 to-teal-500" },
+  commerce:           { label: "Commerce",            emoji: "💼",  color: "from-yellow-500 to-orange-500" },
+  arts:               { label: "Arts",                emoji: "🎨",  color: "from-purple-500 to-pink-500" },
+  it:                 { label: "IT & Coding",         emoji: "💻",  color: "from-indigo-500 to-blue-500" },
+  defence:            { label: "Defence",             emoji: "🎖️",  color: "from-gray-600 to-slate-700" },
+  govt:               { label: "Government",          emoji: "🏛️",  color: "from-orange-500 to-red-500" },
+  all:                { label: "All Topics",          emoji: "📚",  color: "from-violet-500 to-fuchsia-500" },
+  // ── Specific career goal IDs (navigated to via Discover Goal → Watch Videos) ──
+  "software-engineer":  { label: "Software Engineer",  emoji: "🧑‍💻", color: "from-indigo-600 to-blue-600" },
+  "ai-engineer":        { label: "AI Engineer",        emoji: "🤖",  color: "from-violet-600 to-purple-600" },
+  "data-scientist":     { label: "Data Scientist",     emoji: "📊",  color: "from-teal-500 to-cyan-600" },
+  "cybersecurity":      { label: "Cybersecurity",      emoji: "🔐",  color: "from-red-600 to-rose-600" },
+  "mechanical":         { label: "Mechanical Engr.",   emoji: "🔧",  color: "from-blue-600 to-sky-600" },
+  "civil":              { label: "Civil Engineer",     emoji: "🏗️",  color: "from-amber-500 to-yellow-600" },
+  "lawyer":             { label: "Lawyer",             emoji: "⚖️",  color: "from-slate-600 to-gray-700" },
+  "scientist":          { label: "Scientist",          emoji: "🔬",  color: "from-emerald-500 to-green-600" },
+  "entrepreneur":       { label: "Entrepreneur",       emoji: "🚀",  color: "from-orange-500 to-amber-600" },
+  "design":             { label: "Design",             emoji: "🎨",  color: "from-fuchsia-500 to-pink-600" },
+  "digital-marketing":  { label: "Digital Marketing",  emoji: "📣",  color: "from-pink-500 to-rose-500" },
+  "ca":                 { label: "CA (Accountant)",    emoji: "📑",  color: "from-yellow-600 to-amber-700" },
+  "science":            { label: "Science & Research", emoji: "⚗️",  color: "from-green-500 to-emerald-600" },
 };
 
 const LANG_LABELS: Record<string, string> = {

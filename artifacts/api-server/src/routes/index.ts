@@ -14,6 +14,7 @@ import discoverGoalRouter  from "./discover-goal";
 import scholarshipsRouter  from "./scholarships";
 import internshipsRouter   from "./internships";
 import feedbackRouter      from "./feedback";
+import gkRouter            from "./gk";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(discoverGoalRouter);
 router.use(scholarshipsRouter);
 router.use(internshipsRouter);
 router.use(feedbackRouter);
+router.use(gkRouter);
 
 export default router;
