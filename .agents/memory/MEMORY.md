@@ -1,3 +1,5 @@
 - [Hailuo video generation](hailuo-api.md) — APIMALL Hailuo replaces fal.ai; key stored as APIMALL_AI; endpoints kept as pika-generate/pika-status for frontend compat.
-- [News API keys](news-api-keys.md) — User's news keys (NEWSDATA_API_KEY + NEWSDATA_API_KEY_2) are NewsAPI.org keys, NOT NewsData.io. Route must use newsapi.org/v2/everything.
-- [Chat provider priority](chat-providers.md) — Provider cascade: ReplitAI → Groq (GROQ_API_KEY, llama-3.1-8b-instant) → OpenAI/OpenRouter (OPENAI_API_KEY) → Gemini.
+- [News API keys](news-api-keys.md) — GNews is the working live source (GNEWS_API_KEY); cache 30min to avoid rate limits. Static curated fallback always available.
+- [Chat provider priority](chat-providers.md) — Provider cascade: ReplitAI → Groq (GROQ_API_KEY) → OpenAI/OpenRouter → Gemini. When ALL fail, stream a helpful fallback message (never return 503 JSON for chat).
+- [Static fallbacks](static-fallbacks.md) — Every AI route has a static fallback so UI never breaks when Gemini quota (429) is exceeded. Study planner, problem finder, thinking, scholarships, internships, discover-goal all have rich static data.
+- [DB migration](db-migration.md) — Run `cd lib/db && pnpm run push` to create tables; tables are empty by default in a fresh env. Leaderboard 500s are always a missing-table issue.

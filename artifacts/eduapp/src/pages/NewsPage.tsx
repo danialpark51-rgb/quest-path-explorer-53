@@ -82,7 +82,7 @@ const NewsPage = () => {
         <h1 className="text-2xl font-display font-bold text-foreground mb-1">📰 Daily News</h1>
         <div className="flex items-center gap-2 mb-4">
           <p className="text-sm text-muted-foreground">
-            {liveNews.length > 0 ? "Live news powered by NewsData.io" : "Stay updated with latest stories"}
+            {liveNews.length > 0 ? `Live news • ${liveNews.some(a => a.source && a.source !== "EduPath Static") ? "GNews" : "Curated"}` : "Stay updated with latest stories"}
           </p>
           {liveNews.length > 0 && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">● LIVE</span>

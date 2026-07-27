@@ -89,7 +89,7 @@ function deduplicateArticles<T extends { title: string }>(articles: T[]): T[] {
 // ─── Per-(goal+lang) server-side cache ────────────────────────────────────────
 
 const cacheMap = new Map<string, { data: unknown; expiresAt: number }>();
-const CACHE_TTL_MS = 15 * 60 * 1000; // 15 min
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 min — reduces GNews rate-limit risk
 
 // ─── Default image ────────────────────────────────────────────────────────────
 

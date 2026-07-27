@@ -70,7 +70,22 @@ router.post("/chat", async (req, res) => {
     console.warn("[chat] Gemini failed");
   }
 
-  res.status(503).json({ error: "AI service is not available. Please try again later." });
+  // Graceful fallback — stream a helpful message so the UI doesn't break
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("X-Accel-Buffering", "no");
+
+  const fallbackMessage =
+    "I'm sorry, the AI assistant is temporarily unavailable (API quota exceeded). " +
+    "Please try again later, or check your Gemini API billing at https://ai.dev/rate-limit. " +
+    "You can still use all other EduPath features — news, scholarships, internships, videos, and study planner are fully functional!";
+
+  const chunks = fallbackMessage.match(/.{1,15}/g) ?? [fallbackMessage];
+  for (const chunk of chunks) {
+    res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: chunk }, index: 0, finish_reason: null }] })}\n\n`);
+  }
+  res.write("data: [DONE]\n\n");
+  res.end();
 });
 
 // ─── OpenAI-compatible provider (non-throwing, returns success boolean) ───────
