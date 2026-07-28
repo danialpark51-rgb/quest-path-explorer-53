@@ -3,9 +3,10 @@ import { useLanguage, Language } from "@/context/LanguageContext";
 import { goals } from "@/data/goals";
 import { skills } from "@/data/skills";
 import { dailyTasks } from "@/data/dailyTasks";
-import { newsItems } from "@/data/news";
+import { newsItems as staticNewsItems } from "@/data/news";
 import { audioStories } from "@/data/audioStories";
 import { motion } from "framer-motion";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getDailyTaskResource } from "@/data/videoRecommendations";
 import {
@@ -16,10 +17,31 @@ import {
 } from "lucide-react";
 import BottomNav from "@/components/BottomNav";
 
+type LiveNewsItem = {
+  id: string; title: string; summary: string;
+  category: string; date: string; emoji: string; imageUrl: string; content: string;
+};
+
 const HomePage = () => {
   const { user, logout, addXP, completeTask } = useUser();
   const { t, language, setLanguage, languageNames } = useLanguage();
   const navigate = useNavigate();
+
+  const [homeNews, setHomeNews] = useState<LiveNewsItem[]>([]);
+
+  useEffect(() => {
+    const goal = user?.selectedGoal ?? "default";
+    fetch(`/api/news?goal=${goal}&language=${language}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { articles?: LiveNewsItem[] } | null) => {
+        if (d?.articles?.length) setHomeNews(d.articles.slice(0, 3));
+      })
+      .catch(() => {/* silent — fall back to static */});
+  }, [user?.selectedGoal, language]);
+
+  const newsToShow: LiveNewsItem[] = homeNews.length > 0
+    ? homeNews
+    : (staticNewsItems.slice(0, 3) as LiveNewsItem[]);
 
   if (!user) return null;
 
@@ -199,15 +221,19 @@ const HomePage = () => {
           </div>
         </Section>
 
-        {/* News */}
+        {/* News — live from NewsData.io, fallback to static */}
         <Section icon={<Newspaper className="w-5 h-5" />} title={t("home.daily_news")} action={t("home.more")} onAction={() => navigate("/news")}>
           <div className="space-y-2">
-            {newsItems.slice(0, 3).map((news) => (
-              <div key={news.id} className="bg-card rounded-xl border border-border p-3 flex items-start gap-3">
+            {newsToShow.map((news) => (
+              <div
+                key={news.id}
+                onClick={() => navigate("/news")}
+                className="bg-card rounded-xl border border-border p-3 flex items-start gap-3 cursor-pointer hover:shadow-card transition"
+              >
                 <span className="text-2xl flex-shrink-0">{news.emoji}</span>
-                <div>
-                  <h4 className="text-sm font-semibold text-foreground">{news.title}</h4>
-                  <p className="text-xs text-muted-foreground mt-0.5">{news.summary}</p>
+                <div className="min-w-0">
+                  <h4 className="text-sm font-semibold text-foreground line-clamp-2">{news.title}</h4>
+                  <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{news.summary}</p>
                   <span className="text-xs text-primary mt-1 inline-block">{news.category}</span>
                 </div>
               </div>

@@ -598,23 +598,23 @@ const DiscoverGoalPage = () => {
   };
 
   return (
-    <div className={`min-h-screen bg-background ${isOnboarding ? "pb-8" : "pb-28"}`}>
+    <div className={`min-h-screen bg-background ${isOnboarding ? "pb-10" : "pb-28"}`}>
 
       {/* Header */}
-      <div className="bg-gradient-to-br from-violet-600 to-indigo-700 text-white px-4 pt-6 pb-12 rounded-b-3xl">
-        <div className="max-w-2xl mx-auto">
+      <div className="bg-gradient-to-br from-violet-600 to-indigo-700 text-white px-4 pb-8">
+        <div className="max-w-2xl mx-auto pt-6 safe-top">
 
           {/* Top nav row */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             {isOnboarding ? (
               <div>
-                <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">Step 1 of 1</p>
-                <p className="text-sm text-white/80 font-medium">Career Discovery</p>
+                <p className="text-xs font-semibold text-white/60 uppercase tracking-wider">Career Discovery</p>
+                <p className="text-sm text-white/90 font-semibold mt-0.5">Find your perfect path</p>
               </div>
             ) : (
               <button
                 onClick={() => navigate("/home")}
-                className="flex items-center gap-2 text-white/70 hover:text-white transition text-sm"
+                className="flex items-center gap-2 text-white/80 hover:text-white transition text-sm font-medium bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full"
               >
                 <ArrowLeft className="w-4 h-4" /> Home
               </button>
@@ -623,26 +623,26 @@ const DiscoverGoalPage = () => {
             {isOnboarding && (
               <button
                 onClick={handleSkipOnboarding}
-                className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm transition"
+                className="flex items-center gap-1.5 text-white/60 hover:text-white text-sm transition bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-full"
               >
                 <SkipForward className="w-4 h-4" />
-                Skip for now
+                Skip
               </button>
             )}
           </div>
 
           {/* Title */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center flex-shrink-0">
               <Compass className="w-6 h-6 text-white" />
             </div>
             <div>
               {isOnboarding ? (
                 <>
-                  <h1 className="text-xl font-display font-bold">
+                  <h1 className="text-xl font-display font-bold leading-tight">
                     Welcome, {user?.fullName?.split(" ")[0] ?? "there"}! 👋
                   </h1>
-                  <p className="text-sm text-white/70">Let's find your ideal career path</p>
+                  <p className="text-sm text-white/70 mt-0.5">Let's discover your ideal career path</p>
                 </>
               ) : (
                 <>
@@ -654,15 +654,15 @@ const DiscoverGoalPage = () => {
           </div>
 
           {isOnboarding && (
-            <div className="bg-white/10 rounded-xl p-3 mb-4 text-sm text-white/80">
-              ✨ Tell us about yourself and our AI will recommend the best career paths for you. You can change this anytime from your profile.
+            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-3 mb-4 text-sm text-white/90 leading-relaxed">
+              ✨ Describe your interests and our AI will recommend the best career paths personalised for you.
             </div>
           )}
 
           {/* Textarea form */}
           <form onSubmit={handleSubmit} className="space-y-3">
-            <label className="text-sm text-white/80 font-medium">
-              Tell us about yourself — your interests, hobbies, favourite subjects, talents, and dreams:
+            <label className="text-sm text-white/80 font-medium block">
+              Tell us about yourself — interests, hobbies, subjects you love, talents &amp; dreams:
             </label>
             <textarea
               ref={textareaRef}
@@ -671,14 +671,14 @@ const DiscoverGoalPage = () => {
               placeholder={`e.g. "${EXAMPLES[0]}"`}
               rows={4}
               maxLength={2000}
-              className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm outline-none focus:border-white/60 resize-none transition"
+              className="w-full px-4 py-3 rounded-2xl bg-white/10 border border-white/20 text-white placeholder:text-white/40 text-sm outline-none focus:border-white/50 focus:bg-white/15 resize-none transition"
             />
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-white/50">{interests.length}/2000</span>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs text-white/40">{interests.length}/2000</span>
               <button
                 type="submit"
                 disabled={interests.trim().length < 20 || loading}
-                className="flex items-center gap-2 bg-white text-violet-700 font-bold px-5 py-2.5 rounded-xl disabled:opacity-50 hover:bg-violet-50 transition text-sm"
+                className="flex items-center gap-2 bg-white text-violet-700 font-bold px-5 py-2.5 rounded-xl disabled:opacity-40 hover:bg-violet-50 active:scale-95 transition-all text-sm shadow-md"
               >
                 <Sparkles className="w-4 h-4" />
                 {loading ? "Analysing…" : "Discover My Goals"}
@@ -689,13 +689,13 @@ const DiscoverGoalPage = () => {
           {/* Example prompts */}
           {!result && !loading && (
             <div className="mt-4">
-              <p className="text-xs text-white/50 mb-2">Try an example:</p>
+              <p className="text-xs text-white/40 mb-2 font-medium uppercase tracking-wide">Try an example:</p>
               <div className="flex flex-col gap-1.5">
                 {EXAMPLES.slice(0, 2).map((ex) => (
                   <button
                     key={ex}
                     onClick={() => setInterests(ex)}
-                    className="text-left text-xs text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-lg px-3 py-2 transition line-clamp-1"
+                    className="text-left text-xs text-white/70 hover:text-white bg-white/10 hover:bg-white/20 rounded-xl px-3 py-2 transition line-clamp-1 border border-white/10"
                   >
                     "{ex}"
                   </button>
@@ -706,7 +706,7 @@ const DiscoverGoalPage = () => {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-4 -mt-4 space-y-5">
+      <div className="max-w-2xl mx-auto px-4 pt-5 space-y-5">
 
         {/* Goal Search + Custom Goals (always visible) */}
         <div className="mt-4">
