@@ -281,6 +281,17 @@ router.get("/videos", (req, res) => {
     return goalMatch && langMatch && topicMatch;
   });
 
+  // If no videos found for this specific goal, fall back to "all" goal videos
+  // This ensures unrecognised or new goal IDs always return something useful
+  if (filtered.length === 0 && goal !== "all") {
+    filtered = VIDEOS.filter((v) => {
+      const goalMatch  = v.goal === "all";
+      const langMatch  = v.language === language || v.language === "en";
+      const topicMatch = !topic || v.topic.toLowerCase().includes(topic);
+      return goalMatch && langMatch && topicMatch;
+    });
+  }
+
   // Prioritise exact language matches over English fallbacks
   const exact    = filtered.filter((v) => v.language === language);
   const fallback = filtered.filter((v) => v.language === "en" && !exact.some((e) => e.id === v.id));

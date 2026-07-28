@@ -19,25 +19,35 @@ const NewsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<string | null>(null);
+  const [liveSources, setLiveSources] = useState<string[]>([]);
 
-  const fetchNews = async () => {
+  const fetchNews = async (forceRefresh = false) => {
     setLoading(true);
     setError(null);
     try {
       const goal = user?.selectedGoal ?? "default";
       const params = new URLSearchParams({ goal, language });
+      if (forceRefresh) params.set("nocache", "1");
       const res = await fetch(`/api/news?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json() as { articles: ApiArticle[]; fetchedAt?: string; error?: string };
+      const data = await res.json() as {
+        articles: ApiArticle[];
+        fetchedAt?: string;
+        sources?: string[];
+        totalLive?: number;
+        error?: string;
+      };
       if (data.error) throw new Error(data.error);
       if (data.articles && data.articles.length > 0) {
         setLiveNews(data.articles);
         if (data.fetchedAt) setLastFetched(data.fetchedAt);
+        // Store sources for label display
+        if (data.sources) setLiveSources(data.sources);
       } else {
         setLiveNews([]);
       }
     } catch {
-      setError("Could not load live news. Showing cached stories.");
+      setError("Could not load live news. Showing curated stories.");
       setLiveNews([]);
     } finally {
       setLoading(false);
@@ -45,7 +55,7 @@ const NewsPage = () => {
   };
 
   useEffect(() => {
-    fetchNews();
+    fetchNews(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.selectedGoal, language]);
 
@@ -70,7 +80,7 @@ const NewsPage = () => {
             <ArrowLeft className="w-4 h-4" /> Home
           </button>
           <button
-            onClick={fetchNews}
+            onClick={() => fetchNews(true)}
             disabled={loading}
             className="flex items-center gap-1 text-xs text-primary hover:opacity-80 transition disabled:opacity-40"
           >
@@ -82,10 +92,12 @@ const NewsPage = () => {
         <h1 className="text-2xl font-display font-bold text-foreground mb-1">📰 Daily News</h1>
         <div className="flex items-center gap-2 mb-4">
           <p className="text-sm text-muted-foreground">
-            {liveNews.length > 0 ? `Live news • ${liveNews.some(a => a.source && a.source !== "EduPath Static") ? "GNews" : "Curated"}` : "Stay updated with latest stories"}
+            {liveNews.length > 0
+              ? `Live news · ${liveSources.filter(s => s !== "Curated").join(", ") || "Curated"}`
+              : "Stay updated with latest education & career stories"}
           </p>
-          {liveNews.length > 0 && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">● LIVE</span>
+          {liveNews.length > 0 && liveSources.some(s => s !== "Curated") && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 font-medium">● LIVE</span>
           )}
         </div>
 
@@ -97,7 +109,7 @@ const NewsPage = () => {
         )}
 
         {error && !loading && (
-          <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-50 border border-yellow-200 text-sm text-yellow-800">
+          <div className="mb-4 px-4 py-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 text-sm text-yellow-800 dark:text-yellow-300">
             ⚠️ {error}
           </div>
         )}

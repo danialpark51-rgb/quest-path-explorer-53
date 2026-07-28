@@ -97,12 +97,12 @@ interface DiscoverResult {
 
 const DiffBadge = ({ level }: { level: string }) => {
   const map: Record<string, string> = {
-    Beginner:     "bg-green-100 text-green-700 border-green-200",
-    Intermediate: "bg-yellow-100 text-yellow-700 border-yellow-200",
-    Advanced:     "bg-red-100 text-red-700 border-red-200",
+    Beginner:     "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border-green-200 dark:border-green-700",
+    Intermediate: "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-400 border-yellow-200 dark:border-yellow-700",
+    Advanced:     "bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-400 border-red-200 dark:border-red-700",
   };
   return (
-    <span className={`text-xs font-semibold border px-2.5 py-0.5 rounded-full ${map[level] ?? "bg-muted text-muted-foreground"}`}>
+    <span className={`text-xs font-semibold border px-2.5 py-0.5 rounded-full ${map[level] ?? "bg-muted text-muted-foreground border-border"}`}>
       {level}
     </span>
   );
@@ -154,7 +154,7 @@ function mapCareerToGoal(career: string): string {
   if (c.includes("army") || c.includes("navy") || c.includes("air force") || c.includes("nda") || c.includes("defence") || c.includes("military") || c.includes("pilot")) return "defence";
   if (c.includes("commerce") || c.includes("accountant") || c.includes("mba") || c.includes("finance") || c.includes("banker") || c.includes("stock") || c.includes("econom")) return "commerce";
   if (c.includes("artist") || c.includes("painter") || c.includes("musician") || c.includes("actor") || c.includes("film") || c.includes("design") || c.includes("creative") || c.includes("content creator")) return "arts";
-  if (c.includes("research") || c.includes("phd") || c.includes("biotech") || c.includes("biology") || c.includes("chemistry") || c.includes("physics") || c.includes("astronomy")) return "science";
+  if (c.includes("research") || c.includes("phd") || c.includes("biotech") || c.includes("biology") || c.includes("chemistry") || c.includes("physics") || c.includes("astronomy")) return "scientist";
   return "all";
 }
 

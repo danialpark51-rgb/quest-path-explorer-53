@@ -20,7 +20,7 @@ const GoalDetailPage = () => {
       <div className={`px-4 pt-6 pb-8 rounded-b-3xl border-b-2 ${goal.bgClass}`}>
         <div className="max-w-4xl mx-auto">
           <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-muted-foreground hover:text-foreground mb-4 transition">
-            <ArrowLeft className="w-4 h-4" /> {t("back")}
+            <ArrowLeft className="w-4 h-4" /> {t("common.back")}
           </button>
           <div className="flex items-center gap-3 mb-3">
             <span className="text-4xl">{goal.emoji}</span>
@@ -44,7 +44,7 @@ const GoalDetailPage = () => {
       <div className="max-w-4xl mx-auto px-4 mt-6 space-y-6">
         <div>
           <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
-            <BookOpen className="w-5 h-5 text-primary" /> {t("skills_required")}
+            <BookOpen className="w-5 h-5 text-primary" /> {t("goal.skills_req")}
           </h2>
           <div className="flex flex-wrap gap-2">
             {goal.skills.map((s) => (
@@ -55,7 +55,7 @@ const GoalDetailPage = () => {
 
         <div>
           <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
-            <Briefcase className="w-5 h-5 text-primary" /> {t("career_options")}
+            <Briefcase className="w-5 h-5 text-primary" /> {t("goal.career_options")}
           </h2>
           <div className="grid grid-cols-2 gap-2">
             {goal.careers.map((c) => (
@@ -67,7 +67,7 @@ const GoalDetailPage = () => {
         {goalQuizzes.length > 0 && (
           <div>
             <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
-              <Trophy className="w-5 h-5 text-accent" /> {t("quizzes")}
+              <Trophy className="w-5 h-5 text-accent" /> Quizzes
             </h2>
             <div className="space-y-2">
               {goalQuizzes.map((q) => (
@@ -86,7 +86,7 @@ const GoalDetailPage = () => {
 
         <div>
           <h2 className="font-display font-bold text-foreground mb-3 flex items-center gap-2">
-            <Play className="w-5 h-5 text-primary" /> {t("video_library")} ({goal.videos.length})
+            <Play className="w-5 h-5 text-primary" /> {t("goal.video_library")} ({goal.videos.length})
           </h2>
           <EmbeddedVideoLibrary
             videos={goal.videos.map((video, index) => ({

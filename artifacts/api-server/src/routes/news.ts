@@ -75,14 +75,14 @@ function inferCategory(title: string, desc: string): { label: string; emoji: str
 // ─── Goal → search query ──────────────────────────────────────────────────────
 
 const GOAL_QUERIES: Record<string, string> = {
-  engineering: "IIT JEE engineering technology India students",
-  medical:     "NEET medical doctor healthcare India",
-  commerce:    "commerce business finance CA economy India",
-  arts:        "arts design creative culture India students",
-  it:          "technology software AI programming India",
-  defence:     "NDA army navy air force defence India",
-  govt:        "UPSC civil services IAS government India",
-  default:     "education students exam career India 2025",
+  engineering: "JEE IIT engineering technology students India 2025",
+  medical:     "NEET medical college MBBS doctor India 2025",
+  commerce:    "CA commerce business finance economy India 2025",
+  arts:        "arts humanities design creative college India",
+  it:          "software AI technology programming startup India 2025",
+  defence:     "NDA CDS army navy airforce defence India",
+  govt:        "UPSC IAS SSC civil services government exam India 2025",
+  default:     "education exam scholarship career student India 2025",
 };
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
@@ -158,11 +158,12 @@ async function fetchFromNewsData(apiKey: string, query: string): Promise<NewsDat
 async function fetchFromGNews(apiKey: string, query: string): Promise<GNewsArticle[] | null> {
   try {
     const params = new URLSearchParams({
-      q:      query,
-      token:  apiKey,
-      lang:   "en",
-      max:    "10",
-      sortby: "publishedAt",
+      q:       query,
+      token:   apiKey,
+      lang:    "en",
+      country: "in",
+      max:     "10",
+      sortby:  "publishedAt",
     });
 
     const r = await fetch(
@@ -240,89 +241,123 @@ function getStaticArticles(goal: string): AppArticle[] {
 
   const base: AppArticle[] = [
     {
-      id: `s1-${ts}`, category: "Education", emoji: "📚", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://jeeadv.ac.in",
-      title:   "JEE Advanced 2025: Registration Opens — Key Dates and How to Apply",
-      summary: "IIT Bombay has announced the schedule for JEE Advanced 2025. Students who qualify JEE Mains can register now.",
-      content: "IIT Bombay, the organising institute for JEE Advanced 2025, has released key dates. Students who clear JEE Main cutoffs are eligible to apply. The exam tests Physics, Chemistry, and Mathematics at an advanced level.",
+      id: `s1-${ts}`, category: "Education", emoji: "📚", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1588072432836-e10032774350?w=400",
+      source: "EduPath News", link: "https://jeeadv.ac.in",
+      title:   "JEE Advanced 2025: IIT Kanpur Announces Registration Dates and Eligibility",
+      summary: "IIT Kanpur is the organising institute for JEE Advanced 2025. Students clearing JEE Main cutoffs must register before the deadline.",
+      content: "IIT Kanpur has released the official schedule for JEE Advanced 2025. Students who qualify through JEE Main merit list can apply. The exam covers Physics, Chemistry, and Mathematics at an advanced level. Only the top 2,50,000 students from JEE Main are eligible to appear. Results are typically declared within a month of the exam, after which seat allotment through JOSAA begins.",
     },
     {
-      id: `s2-${ts}`, category: "Education", emoji: "🔬", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://nta.ac.in",
-      title:   "NEET UG 2025: Important Updates on Exam Pattern and Syllabus",
-      summary: "National Medical Commission has clarified the NEET UG 2025 syllabus. No major pattern changes.",
-      content: "Medical aspirants can breathe easy as the NEET UG 2025 syllabus remains largely unchanged. The NMC has published the official syllabus on its website for download.",
+      id: `s2-${ts}`, category: "Education", emoji: "🔬", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1576086213369-97a306d36557?w=400",
+      source: "EduPath News", link: "https://nta.ac.in",
+      title:   "NEET UG 2025: NTA Announces Exam Date — Over 24 Lakh Students to Appear",
+      summary: "NTA has confirmed NEET UG 2025 exam date. Over 24 lakh candidates have registered — the highest ever for any medical entrance exam.",
+      content: "The National Testing Agency has confirmed the NEET UG 2025 exam. This year sees a record 24+ lakh registrations. The exam follows a 180-question, 720-mark format across Physics, Chemistry, and Biology. The NTA has implemented multiple security measures including biometric attendance and CCTV monitoring at all exam centres to ensure integrity.",
     },
     {
-      id: `s3-${ts}`, category: "Technology", emoji: "💻", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: null,
-      title:   "India Ranks 3rd Globally in Number of STEM Graduates — Report 2025",
-      summary: "India produces over 2.6 million STEM graduates annually, trailing only China and the US.",
-      content: "India's STEM education ecosystem has seen explosive growth. Engineering colleges are now producing graduates in AI, ML, and data science at record rates.",
+      id: `s3-${ts}`, category: "Technology", emoji: "🤖", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1677442135703-1787eea5ce01?w=400",
+      source: "EduPath News", link: null,
+      title:   "India Launches National AI Mission 2025 — ₹10,300 Crore for AI Infrastructure",
+      summary: "The Government of India launched the IndiaAI Mission with ₹10,371 crore to build computing infrastructure and train 1 million AI professionals by 2028.",
+      content: "The IndiaAI Mission aims to democratise AI across sectors. The mission includes building a shared AI computing infrastructure, creating large-scale datasets, and training students, researchers, and startups. Under this mission, AI courses will be introduced in 5,000 schools and 200 universities. This opens massive career opportunities for Indian students in AI and machine learning roles.",
     },
     {
-      id: `s4-${ts}`, category: "Scholarship", emoji: "🎓", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://scholarships.gov.in",
-      title:   "National Scholarship Portal 2025: Apply Before the Deadline",
-      summary: "NSP scholarships worth up to ₹1.2 lakh per year available for students. Application portal is live.",
-      content: "The National Scholarship Portal has reopened applications for 2025-26. Over 50 central and state government scholarships are available through the single portal.",
+      id: `s4-${ts}`, category: "Scholarship", emoji: "🎓", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=400",
+      source: "EduPath News", link: "https://scholarships.gov.in",
+      title:   "National Scholarship Portal 2025-26: 50+ Scholarships Open for Applications",
+      summary: "NSP scholarships covering pre-matric, post-matric and merit-based awards worth ₹75,000–₹1.2 lakh per year. Deadline approaching.",
+      content: "The National Scholarship Portal has reopened for 2025-26 applications. More than 50 central and state government scholarships are available. Key schemes include the Central Sector Scholarship (top 0.1% in 10+2), National Means-cum-Merit Scholarship, and Post-Matric scholarships for SC/ST/OBC students. Students must apply via NSP to avoid missing out on substantial financial support.",
     },
     {
-      id: `s5-${ts}`, category: "Government", emoji: "🏛️", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://upsc.gov.in",
-      title:   "UPSC Civil Services 2025 Notification Released — Eligibility and Dates",
-      summary: "Over 1000 vacancies across IAS, IPS, IFS and allied services announced by UPSC.",
-      content: "The Union Public Service Commission has officially notified the Civil Services Examination 2025. Candidates with a bachelor's degree from any recognised university are eligible.",
+      id: `s5-${ts}`, category: "Government", emoji: "🏛️", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1560472355-536de3962603?w=400",
+      source: "EduPath News", link: "https://upsc.gov.in",
+      title:   "UPSC Civil Services 2025 Notification: 979 Vacancies — Check IAS, IPS, IFS Openings",
+      summary: "UPSC has released Civil Services 2025 notification with 979 vacancies. Prelims scheduled for June 2025. Eligibility: Any graduate with valid nationality.",
+      content: "The Union Public Service Commission has published the Civil Services Examination (CSE) 2025 notification. A total of 979 vacancies are available across IAS, IPS, IFS, IRS, and other Group A/B central services. The two-stage exam (Prelims + Mains + Interview) is spread over 9-12 months. Success rate is approximately 0.1% — rigorous preparation with a structured study plan starting early is crucial.",
     },
     {
-      id: `s6-${ts}`, category: "Career", emoji: "🚀", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: null,
-      title:   "Google, Microsoft, Amazon Increase India Campus Hiring for 2025",
-      summary: "Big Tech companies are ramping up campus hiring from IITs, NITs and top engineering colleges.",
-      content: "Major technology companies have announced increased campus recruitment drives across Indian engineering institutions. AI/ML, full-stack development roles are most in demand.",
+      id: `s6-${ts}`, category: "Career", emoji: "💼", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1521737604893-d14cc237f11d?w=400",
+      source: "EduPath News", link: null,
+      title:   "IIT, NIT Placements 2025: Average Package Crosses ₹20 LPA at Top Campuses",
+      summary: "IIT Bombay reports ₹23 LPA average, NIT Trichy ₹16 LPA. Software, Data Science, and Finance sectors lead hiring.",
+      content: "Campus placement season 2024-25 concluded with strong results across IITs and NITs. IIT Bombay recorded an average CTC of ₹23 LPA, while NITs averaged ₹16 LPA. Top recruiters include Microsoft, Google, Amazon, Goldman Sachs, and Qualcomm. AI/ML engineers commanded the highest packages, followed by software development and quantitative finance roles. Students should focus on competitive programming, system design, and core subjects.",
     },
     {
-      id: `s7-${ts}`, category: "Science", emoji: "🛸", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://isro.gov.in",
-      title:   "ISRO Young Scientist Programme (YUVIKA) 2025 — Applications Open",
-      summary: "ISRO invites Class 9 students to its space science residential camp. Real space research experience.",
-      content: "The Indian Space Research Organisation invites applications for its Young Scientist Programme. Selected students spend two weeks at ISRO centres learning about rockets, satellites and space science.",
+      id: `s7-${ts}`, category: "Science", emoji: "🚀", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1516849841032-87cbac4d88f7?w=400",
+      source: "EduPath News", link: "https://isro.gov.in",
+      title:   "ISRO Gaganyaan Mission Update 2025 — India's First Crewed Space Mission",
+      summary: "ISRO's Gaganyaan human spaceflight mission is on track for 2025. Test vehicle flights have been completed successfully.",
+      content: "India's historic Gaganyaan mission aims to send three Indian astronauts to space for a 3-day mission in Low Earth Orbit. The selected astronauts (Shubhanshu Shukla, Prashanth Nair, Ajit Krishnan, and Angad Pratap) have completed training in Russia. This mission positions India as one of only four countries (USA, Russia, China) to have independent human spaceflight capability — opening massive careers in aerospace engineering.",
     },
     {
-      id: `s8-${ts}`, category: "Education", emoji: "📝", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: "https://cbse.gov.in",
-      title:   "CBSE Class 10 & 12 Board Exams 2025: Complete Datesheet Released",
-      summary: "CBSE has released the official datesheet for Board Exams 2025. Download from cbse.gov.in.",
-      content: "The Central Board of Secondary Education has published the complete time-table for 2025 board examinations. Students are advised to plan their revision schedule accordingly.",
+      id: `s8-${ts}`, category: "Education", emoji: "📝", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=400",
+      source: "EduPath News", link: "https://cbse.gov.in",
+      title:   "CBSE Introduces Two-Level Maths & New AI Elective in 2025-26 Curriculum",
+      summary: "CBSE rolls out two-level Mathematics (Standard/Basic) for Class 10 and a new Artificial Intelligence elective for Class 11 & 12.",
+      content: "CBSE has announced significant curriculum updates for 2025-26. Class 10 students can now choose between Mathematics Standard (for students targeting engineering/science) and Mathematics Basic (for arts/commerce aspirants). A new AI elective has been introduced for senior secondary, covering machine learning, neural networks, and Python programming. The board has also reduced rote learning, shifting to more competency-based assessment.",
     },
     {
-      id: `s9-${ts}`, category: "Technology", emoji: "🤖", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: null,
-      title:   "AI in Indian Education: 500 Schools Adopt Smart Learning Platforms",
-      summary: "AI-powered personalised learning tools are being deployed in 500 schools across India.",
-      content: "India's education technology sector is booming. AI tools now help teachers personalise learning for students, identify weak areas, and adapt content in real time.",
+      id: `s9-${ts}`, category: "Career", emoji: "🌏", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?w=400",
+      source: "EduPath News", link: null,
+      title:   "India's IT Sector to Create 3.5 Lakh New Jobs in 2025 — NASSCOM Report",
+      summary: "NASSCOM projects strong tech hiring. AI, Cloud, Cybersecurity, and Data Analytics are the top in-demand skills.",
+      content: "India's IT industry is set for robust growth in 2025. NASSCOM's annual report projects 3.5 lakh new technology jobs with 60% focusing on AI-augmented roles. The report highlights that candidates with skills in Generative AI, Cloud Architecture (AWS/Azure/GCP), and Cybersecurity command 40-60% salary premiums. Students should upskill in these domains alongside their core engineering education to maximise placement prospects.",
     },
     {
-      id: `s10-${ts}`, category: "Career", emoji: "💼", date: today, imageUrl: DEFAULT_IMG,
-      source: "EduPath", link: null,
-      title:   "Top 10 Highest-Paying Careers in India for 2025 Graduates",
-      summary: "Data Science, AI, Investment Banking, and Medicine top the list of highest-paying career paths.",
-      content: "A new salary survey highlights the top career paths for Indian graduates. Data Scientists and AI Engineers lead at ₹15–50 LPA starting salary, followed by Investment Banking and Medical specialists.",
+      id: `s10-${ts}`, category: "Education", emoji: "🏆", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1550751827-4bd374c3f58b?w=400",
+      source: "EduPath News", link: null,
+      title:   "India's IISc Bangalore Enters Top 150 Global Universities — QS Rankings 2025",
+      summary: "IISc Bangalore climbs to 130th position in QS World University Rankings 2025. IIT Bombay ranks 118th globally.",
+      content: "Indian institutions have made significant gains in the QS World University Rankings 2025. IIT Bombay leads Indian universities at rank 118, followed by IIT Delhi at 150 and IISc Bangalore at 130. These rankings reflect India's improving research output, international faculty ratio, and employer reputation. Students at these institutions have exceptional placement opportunities with top global companies actively recruiting from Indian campuses.",
+    },
+    {
+      id: `s11-${ts}`, category: "Education", emoji: "📊", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=400",
+      source: "EduPath News", link: "https://cuet.samarth.ac.in",
+      title:   "CUET UG 2025: Central University Admission Test — Dates and Syllabus",
+      summary: "CUET UG 2025 registration is open. Scores accepted by all Central Universities including Delhi University, BHU, JNU, and Jamia.",
+      content: "The Common University Entrance Test (CUET) UG 2025 offers admission to over 260 universities including all Central Universities, many State Universities, and Deemed-to-be Universities. The test covers domain-specific subjects, General Test (Aptitude/Reasoning/GK), and Languages. Unlike board percentages, CUET scores are the primary admission criterion, making it essential for all Class 12 students targeting top universities.",
+    },
+    {
+      id: `s12-${ts}`, category: "Technology", emoji: "💡", date: today,
+      imageUrl: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
+      source: "EduPath News", link: null,
+      title:   "India Digital Literacy Mission: 5 Crore Rural Students to Get Tech Training",
+      summary: "PM e-VIDYA and PM-POSHAN expanded to train 5 crore rural students in digital skills, coding, and e-learning by 2027.",
+      content: "The Government of India has expanded the PM e-VIDYA initiative to reach 5 crore rural students. The programme provides free access to quality digital education content, coding bootcamps, and e-learning platforms via community learning centres. One-rank-one-TV channels broadcast educational content in 12 regional languages. This initiative aims to bridge the rural-urban education divide and create equal opportunities for all Indian students.",
     },
   ];
 
-  // Goal-specific ordering
-  if (goal === "engineering" || goal === "it") {
-    return [base[2], base[0], base[5], base[8], base[6], base[3], base[4], base[9], base[1], base[7]];
+  // Goal-specific ordering — surfaces most relevant articles first
+  if (goal === "engineering" || goal === "it" || goal === "software-engineer" || goal === "ai-engineer" || goal === "data-scientist" || goal === "cybersecurity" || goal === "mechanical" || goal === "civil") {
+    // Tech/Engineering: AI Mission, JEE, IT Jobs, IISc Rankings, ISRO, Scholarships, CUET, Digital Literacy, NEET, CBSE
+    return [base[2], base[0], base[8], base[9], base[6], base[3], base[10], base[11], base[5], base[7], base[4], base[1]];
   }
   if (goal === "medical") {
-    return [base[1], base[3], base[6], base[0], base[2], base[4], base[7], base[5], base[8], base[9]];
+    // Medical: NEET, Scholarships, ISRO, JEE, AI Mission, UPSC, CBSE, Placements, IT Jobs, Rankings
+    return [base[1], base[3], base[6], base[0], base[2], base[4], base[7], base[5], base[8], base[9], base[10], base[11]];
   }
-  if (goal === "govt") {
-    return [base[4], base[7], base[0], base[3], base[5], base[6], base[2], base[1], base[8], base[9]];
+  if (goal === "govt" || goal === "defence") {
+    // Govt/Defence: UPSC, CBSE, JEE, Scholarships, Rankings, AI Mission, ISRO, CUET, Placements, NEET
+    return [base[4], base[7], base[0], base[3], base[9], base[2], base[6], base[10], base[5], base[1], base[8], base[11]];
   }
-  if (goal === "commerce") {
-    return [base[9], base[3], base[5], base[4], base[0], base[2], base[6], base[7], base[1], base[8]];
+  if (goal === "commerce" || goal === "ca" || goal === "entrepreneur") {
+    // Commerce: Placements, Scholarships, Rankings, UPSC, JEE, AI Mission, IT Jobs, CBSE, NEET, ISRO
+    return [base[5], base[3], base[9], base[4], base[0], base[2], base[8], base[7], base[1], base[6], base[10], base[11]];
+  }
+  if (goal === "arts") {
+    // Arts: CUET, CBSE, Scholarships, Rankings, AI Mission, Digital Literacy, Placements, UPSC, JEE, NEET
+    return [base[10], base[7], base[3], base[9], base[2], base[11], base[5], base[4], base[0], base[1], base[8], base[6]];
   }
   return base;
 }
@@ -335,15 +370,19 @@ router.get("/news", async (req, res) => {
 
   const goal     = String(req.query.goal     ?? "default");
   const language = String(req.query.language ?? "en");
+  const nocache  = req.query.nocache === "1";
   const query    = GOAL_QUERIES[goal] ?? GOAL_QUERIES.default;
   const cacheKey = `${goal}:${language}`;
 
-  // Serve from cache if still fresh
+  // Serve from cache if still fresh (skip when nocache=1 for manual refresh)
   const cached = cacheMap.get(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) {
+  if (!nocache && cached && Date.now() < cached.expiresAt) {
     res.json(cached.data);
     return;
   }
+
+  // Invalidate stale cache entry so we always fetch fresh on manual refresh
+  if (nocache) cacheMap.delete(cacheKey);
 
   const ts = Date.now();
 
