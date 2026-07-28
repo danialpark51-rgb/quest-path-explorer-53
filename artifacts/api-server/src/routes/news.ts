@@ -75,14 +75,14 @@ function inferCategory(title: string, desc: string): { label: string; emoji: str
 // ─── Goal → search query ──────────────────────────────────────────────────────
 
 const GOAL_QUERIES: Record<string, string> = {
-  engineering: "JEE IIT engineering technology students India 2025",
-  medical:     "NEET medical college MBBS doctor India 2025",
-  commerce:    "CA commerce business finance economy India 2025",
-  arts:        "arts humanities design creative college India",
-  it:          "software AI technology programming startup India 2025",
-  defence:     "NDA CDS army navy airforce defence India",
-  govt:        "UPSC IAS SSC civil services government exam India 2025",
-  default:     "education exam scholarship career student India 2025",
+  engineering: "engineering India student",
+  medical:     "NEET medical India",
+  commerce:    "business finance India student",
+  arts:        "arts college India",
+  it:          "technology software India",
+  defence:     "UPSC defence India",
+  govt:        "UPSC government India",
+  default:     "education India student",
 };
 
 // ─── Deduplication ────────────────────────────────────────────────────────────
@@ -161,7 +161,6 @@ async function fetchFromGNews(apiKey: string, query: string): Promise<GNewsArtic
       q:       query,
       token:   apiKey,
       lang:    "en",
-      country: "in",
       max:     "10",
       sortby:  "publishedAt",
     });
